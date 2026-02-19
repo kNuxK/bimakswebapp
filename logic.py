@@ -7,6 +7,9 @@ import os
 import io
 import base64
 import math
+import hashlib
+import gspread
+from google.oauth2.service_account import Credentials
 import streamlit as st 
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -32,6 +35,78 @@ except ImportError:
         HAS_PYPDF = True
     except ImportError:
         HAS_PYPDF = False
+
+# ==============================================================================
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 109.0)
+# ==============================================================================
+
+def get_gsheets_client():
+    try:
+        creds_json = st.secrets["gcp_json"]
+        creds_dict = json.loads(creds_json)
+        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
+        return client
+    except Exception as e:
+        st.error(f"Google API Bağlantı Hatası: Lütfen Secrets ayarlarını kontrol edin. Detay: {e}")
+        return None
+
+def get_db_sheet():
+    client = get_gsheets_client()
+    if not client: return None
+    sheet_url = st.secrets["gsheet_url"]
+    return client.open_by_url(sheet_url).sheet1
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def login_user(username, password):
+    sheet = get_db_sheet()
+    if not sheet: return False, "Veritabanı bağlantı hatası."
+    try:
+        records = sheet.get_all_records()
+        hashed_pw = hash_password(password)
+        for row in records:
+            if str(row.get('username')) == username and str(row.get('password')) == hashed_pw:
+                return True, row
+        return False, "Kullanıcı adı veya şifre hatalı!"
+    except Exception as e:
+        return False, f"Okuma hatası: {e}"
+
+def register_user(username, password):
+    sheet = get_db_sheet()
+    if not sheet: return False, "Veritabanı bağlantı hatası."
+    try:
+        records = sheet.get_all_records()
+        for row in records:
+            if str(row.get('username')) == username:
+                return False, "Bu kullanıcı adı zaten alınmış!"
+        
+        hashed_pw = hash_password(password)
+        # Sütunlar: username, password, genai_key, linkedin_token, instagram_token, instagram_account_id
+        new_row = [username, hashed_pw, "", "", "", ""]
+        sheet.append_row(new_row)
+        return True, "Kayıt başarılı! Şimdi giriş yapabilirsiniz."
+    except Exception as e:
+        return False, f"Kayıt hatası: {e}"
+
+def update_user_keys(username, genai, li, insta, insta_id):
+    sheet = get_db_sheet()
+    if not sheet: return False
+    try:
+        users = sheet.col_values(1) # A sütunu (usernames)
+        if username in users:
+            row_idx = users.index(username) + 1
+            sheet.update_cell(row_idx, 3, genai)
+            sheet.update_cell(row_idx, 4, li)
+            sheet.update_cell(row_idx, 5, insta)
+            sheet.update_cell(row_idx, 6, insta_id)
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Güncelleme Hatası: {e}")
+        return False
 
 # ==============================================================================
 # 🧠 MANTIK
@@ -69,7 +144,7 @@ def force_clean_text(text):
     if not text or not isinstance(text, str):
         return "⚠️ HATA: İçerik oluşturulamadı. Lütfen API kotanızı kontrol edin."
         
-    # 1. YANKI (ECHO) KALKANI: AI Promptu aynen ekrana basarsa bunu bul ve imha et.
+    # 1. YANKI (ECHO) KALKANI
     if "ACT AS:" in text.upper() or "MISSION:" in text.upper():
         if "---" in text:
             text = text.split("---")[-1].strip()
@@ -84,21 +159,13 @@ def force_clean_text(text):
     return text.strip()
 
 def smart_trim(text, limit):
-    # Makas tamamen kaldırıldı, yazı kesilmez.
     return text
 
 # --- GEMINI API ---
 def get_gemini_response_from_manual(full_prompt, api_key):
     if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
     
-    models_to_try = [
-        'gemini-2.5-flash',      
-        'gemini-3-flash',        
-        'gemini-2.5-flash-lite', 
-        'gemini-2.5-pro',        
-        'gemini-2.0-flash-exp'   
-    ]
-    
+    models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro']
     genai.configure(api_key=api_key)
     
     last_err = ""
@@ -253,25 +320,22 @@ def calculate_lsi(ph, tds, temp_c, ca_hard, alk):
         return ph - pHs, 2 * pHs - ph
     except: return None, None
 
-# --- MUTLAK DİL KİLİTLİ PROMPT (V 108.0) ---
+# --- PROMPT MİMARİSİ ---
 def construct_prompt_text(role, topic, audience, platform, product, limit, lang_code, product_link=None):
     lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
     lang_name = lang_dict['name']
     detail_lbl = lang_dict.get('detail_info', 'Detaylı Bilgi:')
     
-    # 0.90 KATSAYISI: Karakteri AI'nin anlayacağı kelime kotasına çeviriyoruz (~6.5 karakter = 1 kelime).
     safe_word_limit = int((limit * 0.90) / 6.5)
 
     product_instruction = ""
     link_instruction = ""
 
-    # ÜRÜN KONTROLÜ
     if product and str(product).strip() and str(product).strip() != "...":
         product_instruction = f"- 🧪 PRODUCT INTEGRATION: In your solution section, briefly explain why '{product}' should be used and how it technically solves the discussed problem."
     else:
         product_instruction = "- 🧪 NO PRODUCT: Focus entirely on the technical methodology. Do not mention or promote any commercial products."
 
-    # LİNK KONTROLÜ
     if product_link and str(product_link).strip():
         link_instruction = f"- 🔗 CONCLUSION: End the article with a strong technical summary, then on the absolute final line add exactly this text (DO NOT translate this line):\n{detail_lbl} {product_link}"
     else:
