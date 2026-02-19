@@ -41,7 +41,6 @@ if not st.session_state['logged_in']:
                     if success:
                         st.session_state['logged_in'] = True
                         st.session_state['current_user'] = log_user
-                        # Kullanıcıya özel ayarları DB'den çekip oturuma yazıyoruz:
                         st.session_state['settings_db'] = {
                             "genai_key": data.get('genai_key', ''), 
                             "linkedin_token": data.get('linkedin_token', ''), 
@@ -55,7 +54,7 @@ if not st.session_state['logged_in']:
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.error(data) # Hata mesajı
+                        st.error(data)
 
         with tab2:
             reg_user = st.text_input("Yeni Kullanıcı Adı", key="reg_user")
@@ -68,7 +67,7 @@ if not st.session_state['logged_in']:
                         success, msg = logic.register_user(reg_user, reg_pass)
                         if success: st.success(msg)
                         else: st.error(msg)
-    st.stop() # Giriş yapılmadıysa uygulamanın geri kalanını GÖSTERME.
+    st.stop()
 
 # ==========================================
 # GİRİŞ YAPILDIKTAN SONRAKİ UYGULAMA KODLARI
@@ -389,6 +388,42 @@ elif st.session_state.get('show_settings'):
         with st.expander(t('set_admin')):
             ap = st.text_input(_("Admin Şifresi", "Admin Password", "Пароль администратора", "كلمة مرور المسؤول"), type="password")
             if ap == "opop0":
+                
+                # --- YENİ KULLANICI YÖNETİMİ PANELİ (V 110.0) ---
+                st.markdown("---")
+                st.subheader(_("👥 Kullanıcı Yönetimi", "👥 User Management", "👥 Управление пользователями", "👥 إدارة المستخدمين"))
+                
+                all_users = logic.get_all_users()
+                if all_users:
+                    st.write("**Mevcut Kullanıcılar:**")
+                    for u in all_users:
+                        col_u, col_del = st.columns([8, 2])
+                        col_u.code(u)
+                        if col_del.button("🗑️ Sil", key=f"del_user_{u}"):
+                            if u == st.session_state['current_user']:
+                                st.error("Aktif (kendi) hesabınızı silemezsiniz!")
+                            else:
+                                with st.spinner("Siliniyor..."):
+                                    s, m = logic.delete_user(u)
+                                    if s: st.success(m); time.sleep(1); st.rerun()
+                                    else: st.error(m)
+                else:
+                    st.info("Kayıtlı kullanıcı yok.")
+                    
+                with st.expander("➕ Yeni Kullanıcı Ekle"):
+                    n_u = st.text_input("Kullanıcı Adı", key="admin_add_u")
+                    n_p = st.text_input("Şifre", key="admin_add_p")
+                    if st.button("Hesap Oluştur", type="primary"):
+                        if len(n_u) < 3 or len(n_p) < 3:
+                            st.warning("Kullanıcı adı ve şifre en az 3 karakter olmalı.")
+                        else:
+                            with st.spinner("Ekleniyor..."):
+                                s, m = logic.register_user(n_u, n_p)
+                                if s: st.success(f"'{n_u}' başarıyla oluşturuldu!"); time.sleep(1); st.rerun()
+                                else: st.error(m)
+                # ------------------------------------------------
+                
+                st.markdown("---")
                 st.subheader(t('set_logo'))
                 ul = st.file_uploader(t('set_logo_btn'), type=['png', 'jpg', 'jpeg'])
                 if ul: st.session_state['logo_data'] = ul.getvalue(); st.success(_("Logo Güncellendi!", "Logo Updated!", "Логотип обновлен!", "تم تحديث الشعار!"))
@@ -430,7 +465,6 @@ elif st.session_state.get('show_settings'):
             st.session_state['settings_db'].update({"genai_key": k1, "linkedin_token": k2, "instagram_token": k3, "instagram_account_id": k4})
             
             with st.spinner("Veritabanına kaydediliyor..."):
-                # VERİTABANINA YAZMA (V 109.0)
                 is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
                 if is_saved:
                     st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!"))
