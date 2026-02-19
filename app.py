@@ -10,25 +10,13 @@ except: pass
 
 st.set_page_config(page_title="BİMAKS APP V 1.0", layout="wide", page_icon="💧", initial_sidebar_state="expanded")
 
-if 'personas_db' not in st.session_state: st.session_state['personas_db'] = config.DEFAULT_PERSONAS
-if 'history_db' not in st.session_state: st.session_state['history_db'] = []
-if 'settings_db' not in st.session_state: 
-    st.session_state['settings_db'] = {
-        "genai_key": "", "linkedin_token": "", "instagram_token": "", "instagram_account_id": "", 
-        "theme_bg": "#0E1117", "theme_txt": "#FAFAFA", "theme_btn": "#8998f3", 
-        "app_title": "BİMAKS APP V 1.0", "app_footer": "Created by Ogün Gümüşay",
-        "enable_quote": True, "enable_social_media": True, "enable_linkedin": True, "enable_instagram": False, "enable_problem_solver": True
-    }
+# --- KİMLİK DOĞRULAMA (LOGIN) SİSTEMİ ---
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+if 'current_user' not in st.session_state:
+    st.session_state['current_user'] = ""
 
-if 'lang' not in st.session_state: st.session_state['lang'] = 'TR'
-if 'bimaks_sub_tab' not in st.session_state: st.session_state['bimaks_sub_tab'] = 'Analysis'
-
-for k in ['logo_data', 'template_data', 'quote_items', 'insta_tags_list', 'active_tab', 'linkedin_editor', 'insta_editor', 'ocr_result', 'linkedin_warning', 'insta_warning']:
-    if k not in st.session_state: st.session_state[k] = None if k in ['logo_data', 'template_data', 'active_tab'] else ([] if 'list' in k or 'quote' in k else "")
-
-def t(key): return config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR']).get(key, key)
-
-# --- 🌐 YENİ ÇEVİRİ MOTORU (Uygulamanın Gömülü Yazıları İçin) ---
+def t(key): return config.LANGUAGES.get(st.session_state.get('lang', 'TR'), config.LANGUAGES['TR']).get(key, key)
 def _(tr, en, ru, ar):
     l = st.session_state.get('lang', 'TR')
     if l == 'EN': return en
@@ -36,10 +24,73 @@ def _(tr, en, ru, ar):
     if l == 'AR': return ar
     return tr
 
+# LOGIN EKRANI
+if not st.session_state['logged_in']:
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown("<h1 style='text-align: center;'>💧 BİMAKS APP GİRİŞ</h1>", unsafe_allow_html=True)
+        st.markdown("---")
+        tab1, tab2 = st.tabs(["🔑 Giriş Yap", "📝 Kayıt Ol"])
+        
+        with tab1:
+            log_user = st.text_input("Kullanıcı Adı", key="log_user")
+            log_pass = st.text_input("Şifre", type="password", key="log_pass")
+            if st.button("Giriş", type="primary", use_container_width=True):
+                with st.spinner("Doğrulanıyor..."):
+                    success, data = logic.login_user(log_user, log_pass)
+                    if success:
+                        st.session_state['logged_in'] = True
+                        st.session_state['current_user'] = log_user
+                        # Kullanıcıya özel ayarları DB'den çekip oturuma yazıyoruz:
+                        st.session_state['settings_db'] = {
+                            "genai_key": data.get('genai_key', ''), 
+                            "linkedin_token": data.get('linkedin_token', ''), 
+                            "instagram_token": data.get('instagram_token', ''), 
+                            "instagram_account_id": data.get('instagram_account_id', ''), 
+                            "theme_bg": "#0E1117", "theme_txt": "#FAFAFA", "theme_btn": "#8998f3", 
+                            "app_title": "BİMAKS APP", "app_footer": "Created by Ogün Gümüşay",
+                            "enable_quote": True, "enable_social_media": True, "enable_linkedin": True, "enable_instagram": False, "enable_problem_solver": True
+                        }
+                        st.success("Giriş Başarılı! Yönlendiriliyorsunuz...")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(data) # Hata mesajı
+
+        with tab2:
+            reg_user = st.text_input("Yeni Kullanıcı Adı", key="reg_user")
+            reg_pass = st.text_input("Yeni Şifre", type="password", key="reg_pass")
+            if st.button("Kayıt Ol", use_container_width=True):
+                if len(reg_user) < 3 or len(reg_pass) < 3:
+                    st.warning("Kullanıcı adı ve şifre en az 3 karakter olmalıdır.")
+                else:
+                    with st.spinner("Kayıt yapılıyor..."):
+                        success, msg = logic.register_user(reg_user, reg_pass)
+                        if success: st.success(msg)
+                        else: st.error(msg)
+    st.stop() # Giriş yapılmadıysa uygulamanın geri kalanını GÖSTERME.
+
+# ==========================================
+# GİRİŞ YAPILDIKTAN SONRAKİ UYGULAMA KODLARI
+# ==========================================
+
+if 'personas_db' not in st.session_state: st.session_state['personas_db'] = config.DEFAULT_PERSONAS
+if 'history_db' not in st.session_state: st.session_state['history_db'] = []
+if 'lang' not in st.session_state: st.session_state['lang'] = 'TR'
+if 'bimaks_sub_tab' not in st.session_state: st.session_state['bimaks_sub_tab'] = 'Analysis'
+
+for k in ['logo_data', 'template_data', 'quote_items', 'insta_tags_list', 'active_tab', 'linkedin_editor', 'insta_editor', 'ocr_result', 'linkedin_warning', 'insta_warning']:
+    if k not in st.session_state: st.session_state[k] = None if k in ['logo_data', 'template_data', 'active_tab'] else ([] if 'list' in k or 'quote' in k else "")
+
 logic.apply_theme()
 
 # --- SIDEBAR ---
 with st.sidebar:
+    st.success(f"👤 Hoşgeldin, **{st.session_state['current_user']}**")
+    if st.button("🚪 Çıkış Yap", use_container_width=True):
+        st.session_state['logged_in'] = False
+        st.rerun()
+    
     if st.session_state.get('logo_data'): st.image(st.session_state['logo_data'], use_container_width=True)
     elif os.path.exists("logo.jpg"): st.image("logo.jpg", use_container_width=True)
     st.markdown(f"<h1 style='text-align: center;'>{st.session_state['settings_db'].get('app_title')}</h1>", unsafe_allow_html=True)
@@ -74,9 +125,9 @@ with st.sidebar:
 # --- ANA EKRAN ---
 
 # 1. BİMAKS TEKNİK
-if st.session_state['active_tab'] == t('btn_bimaks_tech'):
+if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session_state.get('show_settings'):
     st.header(t('btn_bimaks_tech'))
-    if not st.session_state['settings_db'].get("genai_key"): st.info(_("👋 API Anahtarı Gerekli", "👋 API Key Required", "👋 Требуется ключ API", "👋 مفتاح API مطلوب")); st.stop()
+    if not st.session_state['settings_db'].get("genai_key"): st.info(_("👋 API Anahtarı Gerekli. Lütfen Ayarlar'dan API girin.", "👋 API Key Required.", "👋 Требуется ключ API", "👋 مفتاح API مطلوب")); st.stop()
     
     nav_c1, nav_c2, nav_c3, nav_c4 = st.columns(4)
     if nav_c1.button(t('nav_analysis'), use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'Analysis' else "secondary"): st.session_state['bimaks_sub_tab'] = 'Analysis'; st.rerun()
@@ -203,7 +254,7 @@ if st.session_state['active_tab'] == t('btn_bimaks_tech'):
             st.markdown(res)
 
 # 2. LINKEDIN
-elif st.session_state['active_tab'] == t('btn_linkedin'):
+elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_state.get('show_settings'):
     with st.expander(t('step1_linkedin_title'), expanded=False):
         ui_personas = logic.get_persona_list_for_ui()
         sel_p = st.selectbox(t('sys_select'), ui_personas, index=0, key="li_p")
@@ -238,10 +289,9 @@ elif st.session_state['active_tab'] == t('btn_linkedin'):
                     else:
                         st.session_state['linkedin_warning'] = ""
                         
-                    # YENİ METNİ AL VE METİN KUTUSUNUN BELLEĞİNE ZORLA ENJEKTE ET (V 108.1 Çözümü)
                     yeni_makale = logic.smart_trim(cleaned_res, c_lim)
                     st.session_state['linkedin_editor'] = yeni_makale
-                    st.session_state['linkedin_editor_area'] = yeni_makale # 🔥 ZORLA GÜNCELLEME BURADA YAPILIYOR
+                    st.session_state['linkedin_editor_area'] = yeni_makale 
                         
                     st.rerun()
 
@@ -249,7 +299,6 @@ elif st.session_state['active_tab'] == t('btn_linkedin'):
         c1, c2 = st.columns(2)
         with c1: 
             st.subheader(t('editor'))
-            
             if st.session_state.get('linkedin_warning'):
                 st.warning(st.session_state['linkedin_warning'])
                 
@@ -272,7 +321,7 @@ elif st.session_state['active_tab'] == t('btn_linkedin'):
         else: [st.text(f"{h['date']} | {h['topic']} | {h['role']}") for h in st.session_state['history_db']]
 
 # 3. INSTAGRAM
-elif st.session_state['active_tab'] == t('btn_instagram'):
+elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session_state.get('show_settings'):
     if not st.session_state['settings_db'].get("genai_key"): st.warning(f"⚠️ {t('guide_title_main')}"); st.rerun()
     with st.expander(t('step1_linkedin_title'), expanded=False):
         ui_personas = logic.get_persona_list_for_ui()
@@ -297,11 +346,9 @@ elif st.session_state['active_tab'] == t('btn_instagram'):
                     else:
                         st.session_state['insta_warning'] = ""
                         
-                    # INSTAGRAM İÇİN DE AYNI ZORLA GÜNCELLEME MANTIĞI EKLENDİ
                     yeni_makale = logic.smart_trim(cleaned_res, c_lim)
                     st.session_state['insta_editor'] = yeni_makale
-                    st.session_state['insta_editor_area'] = yeni_makale # 🔥 ZORLA GÜNCELLEME BURADA
-                        
+                    st.session_state['insta_editor_area'] = yeni_makale
                     st.rerun()
 
     col1, col2 = st.columns([1, 1])
@@ -362,24 +409,34 @@ elif st.session_state.get('show_settings'):
                 pe = st.checkbox(_("Problem Çözücü", "Problem Solver", "Решатель проблем", "حل المشكلات"), st.session_state['settings_db'].get("enable_problem_solver"))
                 qe = st.checkbox(_("Teklif", "Quote", "Коммерческое предложение", "اقتباس"), st.session_state['settings_db'].get("enable_quote"))
                 
-                if st.button(_("Admin Kaydet", "Save Admin", "Сохранить админ", "حفظ المسؤول")): 
+                if st.button(_("Tema Kaydet", "Save Theme", "Сохранить тему", "حفظ السمة")): 
                     st.session_state['settings_db'].update({
                         "app_title": nt, "app_footer": nf, "enable_social_media": se, 
                         "enable_linkedin": li, "enable_instagram": ins, "enable_problem_solver": pe, 
                         "enable_quote": qe, "theme_bg": nbg, "theme_txt": ntxt, "theme_btn": nbtn
                     })
-                    st.success(_("Admin Ayarları Güncellendi!", "Admin Settings Updated!", "Настройки администратора обновлены!", "تم تحديث إعدادات المسؤول!")); time.sleep(1); st.rerun()
+                    st.success("Tema güncellendi!"); time.sleep(1); st.rerun()
                 
-        
     with c2:
-        st.subheader(t('set_api_keys'))
-        k1 = st.text_input("Gemini API", st.session_state['settings_db'].get("genai_key"), type="password")
-        k2 = st.text_input("LinkedIn Token", st.session_state['settings_db'].get("linkedin_token"), type="password")
-        k3 = st.text_input("Instagram Token", st.session_state['settings_db'].get("instagram_token"), type="password")
-        k4 = st.text_input("Instagram Account ID", st.session_state['settings_db'].get("instagram_account_id"))
+        st.subheader(_("Kişisel API Ayarların", "Personal API Settings", "Ваши настройки API", "إعدادات API الشخصية"))
+        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД только для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط."))
+        
+        k1 = st.text_input("Gemini API", st.session_state['settings_db'].get("genai_key", ""), type="password")
+        k2 = st.text_input("LinkedIn Token", st.session_state['settings_db'].get("linkedin_token", ""), type="password")
+        k3 = st.text_input("Instagram Token", st.session_state['settings_db'].get("instagram_token", ""), type="password")
+        k4 = st.text_input("Instagram Account ID", st.session_state['settings_db'].get("instagram_account_id", ""))
+        
         if st.button(t('set_save'), type="primary"):
             st.session_state['settings_db'].update({"genai_key": k1, "linkedin_token": k2, "instagram_token": k3, "instagram_account_id": k4})
-            st.success(_("Kaydedildi!", "Saved!", "Сохранено!", "تم الحفظ!")); time.sleep(1); st.rerun()
+            
+            with st.spinner("Veritabanına kaydediliyor..."):
+                # VERİTABANINA YAZMA (V 109.0)
+                is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
+                if is_saved:
+                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!"))
+                else:
+                    st.error("Veritabanına kaydedilirken bir hata oluştu.")
+            time.sleep(1); st.rerun()
     
     st.markdown("---")
     with st.expander(t('guide_btn'), expanded=True):
@@ -389,7 +446,7 @@ elif st.session_state.get('show_settings'):
     if st.button(t('back_btn'), type="secondary"): st.session_state['show_settings'] = False; st.rerun()
 
 # 5. TEKLİF OLUŞTUR
-elif st.session_state.get('active_tab') == t('btn_quote'):
+elif st.session_state.get('active_tab') == t('btn_quote') and not st.session_state.get('show_settings'):
     st.header(t('quote_title'))
     
     with st.expander(_("📄 Antetli Kağıt Ayarı", "📄 Letterhead Setup", "📄 Настройка бланка", "📄 إعداد الترويسة"), expanded=True):
