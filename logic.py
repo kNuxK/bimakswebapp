@@ -37,7 +37,7 @@ except ImportError:
         HAS_PYPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 109.0)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 110.0)
 # ==============================================================================
 
 def get_gsheets_client():
@@ -84,10 +84,9 @@ def register_user(username, password):
                 return False, "Bu kullanıcı adı zaten alınmış!"
         
         hashed_pw = hash_password(password)
-        # Sütunlar: username, password, genai_key, linkedin_token, instagram_token, instagram_account_id
         new_row = [username, hashed_pw, "", "", "", ""]
         sheet.append_row(new_row)
-        return True, "Kayıt başarılı! Şimdi giriş yapabilirsiniz."
+        return True, "Kayıt başarılı!"
     except Exception as e:
         return False, f"Kayıt hatası: {e}"
 
@@ -95,7 +94,7 @@ def update_user_keys(username, genai, li, insta, insta_id):
     sheet = get_db_sheet()
     if not sheet: return False
     try:
-        users = sheet.col_values(1) # A sütunu (usernames)
+        users = sheet.col_values(1) 
         if username in users:
             row_idx = users.index(username) + 1
             sheet.update_cell(row_idx, 3, genai)
@@ -107,6 +106,35 @@ def update_user_keys(username, genai, li, insta, insta_id):
     except Exception as e:
         st.error(f"Güncelleme Hatası: {e}")
         return False
+
+# --- YENİ ADMİN KULLANICI YÖNETİMİ FONKSİYONLARI ---
+def get_all_users():
+    sheet = get_db_sheet()
+    if not sheet: return []
+    try:
+        records = sheet.get_all_records()
+        return [str(r.get('username')) for r in records if r.get('username')]
+    except:
+        return []
+
+def delete_user(target_username):
+    sheet = get_db_sheet()
+    if not sheet: return False, "Veritabanı bağlantı hatası."
+    try:
+        users = sheet.col_values(1)
+        if target_username in users:
+            row_idx = users.index(target_username) + 1
+            if row_idx == 1:
+                return False, "Başlık satırı silinemez!"
+            # Gspread sürümüne göre delete_rows veya delete_row çağrısı
+            try:
+                sheet.delete_rows(row_idx)
+            except AttributeError:
+                sheet.delete_row(row_idx)
+            return True, f"'{target_username}' başarıyla silindi."
+        return False, "Kullanıcı bulunamadı."
+    except Exception as e:
+        return False, f"Silme hatası: {str(e)}"
 
 # ==============================================================================
 # 🧠 MANTIK
@@ -144,7 +172,6 @@ def force_clean_text(text):
     if not text or not isinstance(text, str):
         return "⚠️ HATA: İçerik oluşturulamadı. Lütfen API kotanızı kontrol edin."
         
-    # 1. YANKI (ECHO) KALKANI
     if "ACT AS:" in text.upper() or "MISSION:" in text.upper():
         if "---" in text:
             text = text.split("---")[-1].strip()
@@ -153,9 +180,7 @@ def force_clean_text(text):
             if match:
                 text = match.group(1).strip()
     
-    # 2. GEREKSİZ GİRİŞ CÜMLELERİNİ TEMİZLE
     text = re.sub(r'^(Merhaba|Ben|Sen|Biz|Bir yapay zeka|Yapay zeka|İşte makaleniz|Hazırladığım|Here is|Sure|As requested|Here\'s|I have written).*?[\.\!\?]\s*', '', text, flags=re.IGNORECASE)
-    
     return text.strip()
 
 def smart_trim(text, limit):
