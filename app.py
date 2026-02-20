@@ -260,27 +260,56 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 114.0)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.0)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
-        
-        # --- YENİ V 114.0 BELGE TÜRÜ SEÇİMİ ---
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
-        
         st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية."))
         
         c_p1, c_p2 = st.columns([1, 1])
         
         with c_p1:
-            # Seçilen Belge Türüne Göre Etiketler Otomatik Değişir
             sds_file = st.file_uploader(_(f"1. Orijinal {doc_type} (PDF)", f"1. Original {doc_type} (PDF)", f"1. Оригинальный {doc_type}", f"1. {doc_type} الأصلي"), type=['pdf'])
             d_logo = st.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل"), type=['png', 'jpg', 'jpeg'])
             d_addr = st.text_area(_("3. Bayi Adresi (Aşağıya yazılacak)", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
             
+            # --- YENİ V 115.0: PDF İÇİ METİN BUL VE DEĞİŞTİR SİSTEMİ ---
+            text_replacements = []
+            
+            if doc_type == "SDS":
+                with st.expander("📝 Belge İçi Metin Değiştirme (Find & Replace)", expanded=True):
+                    st.caption("Aşağıdaki alanlar PDF içindeki o kelimeleri bulup, tam yerlerine yenisini yazar. Canlı Önizlemede anında görebilirsiniz.")
+                    
+                    c_r1, c_r2 = st.columns(2)
+                    st.markdown("**1. Ürün Adı (Maks 132 vs.)**")
+                    old_prod = c_r1.text_input("Bulunacak Kelime", "MAKS 132", key="or_p1")
+                    new_prod = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Ürün Adı", key="nw_p1")
+                    
+                    st.markdown("**2. Kimyasal Adı**")
+                    old_chem = c_r1.text_input("Bulunacak Kelime", "TEMİZLEME ÜRÜNÜ", key="or_p2")
+                    new_chem = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Kimyasal Adı", key="nw_p2")
+                    
+                    st.markdown("**3. Tedarikçi Bilgisi**")
+                    old_sup = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA VE GIDA DIŞ TİCARET LTD. ŞTİ.", key="or_p3")
+                    new_sup = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Tedarikçi", key="nw_p3")
+                    
+                    st.markdown("**4. Başvurulacak Kişi**")
+                    old_per = c_r1.text_input("Bulunacak Kelime", "AYŞE ARPACI, ROY KARASU", key="or_p4")
+                    new_per = c_r2.text_input("Bununla Değiştir", placeholder="Yeni İletişim Kişisi", key="nw_p4")
+                    
+                    st.markdown("**5. Acil Durum Telefonu**")
+                    old_tel = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA: 0 850 522 71 04", key="or_p5")
+                    new_tel = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Telefon Numarası", key="nw_p5")
+                    
+                    if new_prod: text_replacements.append((old_prod, new_prod))
+                    if new_chem: text_replacements.append((old_chem, new_chem))
+                    if new_sup: text_replacements.append((old_sup, new_sup))
+                    if new_per: text_replacements.append((old_per, new_per))
+                    if new_tel: text_replacements.append((old_tel, new_tel))
+
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
-                st.caption("PDF üzerindeki öğelerin ve beyaz maskelerin yerlerini X (Sağ-Sol), Y (Yukarı-Aşağı), Genişlik ve Yükseklik olarak ayarlayın.")
+                st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
                 
-                # V 114.0 - 4 EKSENLİ ÜST MASKE
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
                 ct1, ct2, ct3, ct4 = st.columns(4)
                 top_mask_x = ct1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_tm_x")
@@ -288,7 +317,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 top_mask_w = ct3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_tm_w")
                 top_mask_h = ct4.slider("Yükseklik", 0, 300, 110, key=f"{doc_type}_tm_h")
                 
-                # V 114.0 - 4 EKSENLİ ALT MASKE
                 st.markdown("**2. Alt Beyaz Maske (Eski Adresi Gizler)**")
                 cb1, cb2, cb3, cb4 = st.columns(4)
                 bot_mask_x = cb1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_bm_x")
@@ -318,7 +346,8 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                             top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                             bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                             logo_x, logo_y, logo_w, addr_x, addr_y, 
-                            st.session_state['lang']
+                            st.session_state['lang'],
+                            text_replacements # Yeni metin değiştirme modülü
                         )
                         if pdf_out:
                             st.success(f"İşlem Başarılı! {doc_type} bütün sayfalara uygulandı.")
@@ -331,14 +360,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         with c_p2:
             st.markdown(_(f"**👀 Canlı Önizleme (Yüklediğiniz {doc_type})**", "**👀 Live Preview**", "**👀 Предварительный просмотр**", "**👀 معاينة حية**"))
             
-            # Canlı Önizlemeyi Oluştur
             preview_img = logic.generate_sds_preview(
                 sds_file.getvalue() if sds_file else None,
                 d_logo.getvalue() if d_logo else None, 
                 d_addr, 
                 top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                 bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                logo_x, logo_y, logo_w, addr_x, addr_y
+                logo_x, logo_y, logo_w, addr_x, addr_y,
+                text_replacements # Önizleme anında metinler değişsin diye eklendi
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
