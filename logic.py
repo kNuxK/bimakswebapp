@@ -37,7 +37,7 @@ except ImportError:
     except ImportError:
         HAS_PYPDF = False
 
-# PDF Canlı Önizleme Kütüphanesi
+# PDF Canlı Önizleme ve Metin Değiştirme Kütüphanesi
 try:
     import fitz 
     HAS_PYMUPDF = True
@@ -515,13 +515,52 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
-# --- YENİ V 114.0: BAYİ SDS/TDS MASKELEME MOTORU (4 EKSENLİ) ---
+# --- YENİ V 115.0: PDF İÇİ METİN DEĞİŞTİRME MOTORU (BUL VE DEĞİŞTİR) ---
+def replace_text_in_pdf_bytes(pdf_bytes, replacements):
+    """
+    Bu fonksiyon orijinal PDF'teki belirlenen yazıları bulup, beyaz bant atıp yenisini yazar.
+    PyMuPDF (fitz) kütüphanesi kullanır.
+    """
+    if not HAS_PYMUPDF or not pdf_bytes or not replacements:
+        return pdf_bytes
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        for page in doc:
+            for old_text, new_text in replacements:
+                if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
+                    # Eski metni PDF'te ara
+                    text_instances = page.search_for(str(old_text))
+                    for inst in text_instances:
+                        # Bulunan kelimenin üstünü beyaz bir dikdörtgenle (redact) kapa
+                        page.add_redact_annot(inst, fill=(1, 1, 1))
+                        page.apply_redactions()
+                        
+                        # Font büyüklüğünü otomatik ayarla
+                        font_sz = inst.height * 0.85
+                        # Yeni metni tam silinen metnin koordinatlarına yapıştır
+                        page.insert_text((inst.x0, inst.y1 - (inst.height * 0.15)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
+        
+        output = io.BytesIO()
+        doc.save(output)
+        output.seek(0)
+        return output.read()
+    except Exception as e:
+        # Hata durumunda orijinal dosyayı bozmadan geri yolla
+        return pdf_bytes
+
+# --- YENİ V 115.0: BAYİ SDS/TDS MASKELEME MOTORU ---
 def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
                       top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                       bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                      logo_x, logo_y, logo_w, addr_x, addr_y, lang_code):
+                      logo_x, logo_y, logo_w, addr_x, addr_y, lang_code, text_replacements=None):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
+    
+    # 1. ÖNCE PDF İÇİNDEKİ YAZILARI DEĞİŞTİR (V 115.0)
+    if text_replacements:
+        original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, text_replacements)
+        
     try:
+        # 2. SONRA YENİ LOGO VE MASKELEME İŞLEMİ (ReportLab ile)
         original_pdf = PdfReader(io.BytesIO(original_pdf_bytes))
         writer = PdfWriter()
         
@@ -537,17 +576,14 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             
         c = canvas.Canvas(packet, pagesize=(width, height))
         
-        # 1. Üst Bembeyaz Bant (X, Y, Genişlik, Yükseklik)
         if top_mask_h > 0 and top_mask_w > 0:
             c.setFillColorRGB(1, 1, 1)
             c.rect(top_mask_x, height - top_mask_y - top_mask_h, top_mask_w, top_mask_h, fill=1, stroke=0)
             
-        # 2. Alt Bembeyaz Bant (X, Y, Genişlik, Yükseklik)
         if bot_mask_h > 0 and bot_mask_w > 0:
             c.setFillColorRGB(1, 1, 1)
             c.rect(bot_mask_x, height - bot_mask_y - bot_mask_h, bot_mask_w, bot_mask_h, fill=1, stroke=0)
         
-        # 3. Bayi Logosunu Çiz
         if dealer_logo_bytes:
             try:
                 logo_img = ImageReader(io.BytesIO(dealer_logo_bytes))
@@ -557,7 +593,6 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                 c.drawImage(logo_img, logo_x, height - logo_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
             except: pass
         
-        # 4. Bayi Adresini Yaz
         if dealer_address:
             try:
                 f_reg = register_embedded_font() or "Helvetica"
@@ -590,15 +625,19 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
     except Exception as e:
         return None
 
-# --- YENİ V 114.0: GÖRSEL CANLI ÖNİZLEME MOTORU (4 EKSENLİ) ---
+# --- YENİ V 115.0: GÖRSEL CANLI ÖNİZLEME MOTORU (DEĞİŞTİRİLEN METİNLERLE) ---
 def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
                          top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                          bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                         logo_x, logo_y, logo_w, addr_x, addr_y):
+                         logo_x, logo_y, logo_w, addr_x, addr_y, text_replacements=None):
     width, height = 595, 842 
     img = None
     
     if original_pdf_bytes and HAS_PYMUPDF:
+        # Önizlemede de önce yazıları değiştiriyoruz ki kullanıcı canlı görebilsin
+        if text_replacements:
+            original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, text_replacements)
+            
         try:
             doc = fitz.open(stream=original_pdf_bytes, filetype="pdf")
             page = doc.load_page(0)
@@ -614,15 +653,12 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
     
     draw = ImageDraw.Draw(img)
     
-    # 2. Üst Maske Çizimi (X ve Genişlik eklendi)
     if top_mask_h > 0 and top_mask_w > 0:
         draw.rectangle([top_mask_x, top_mask_y, top_mask_x + top_mask_w, top_mask_y + top_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
         
-    # 3. Alt Maske Çizimi (X ve Genişlik eklendi)
     if bot_mask_h > 0 and bot_mask_w > 0:
         draw.rectangle([bot_mask_x, bot_mask_y, bot_mask_x + bot_mask_w, bot_mask_y + bot_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
     
-    # 4. Logo Yerleşimi
     if dealer_logo_bytes:
         try:
             logo = Image.open(io.BytesIO(dealer_logo_bytes)).convert("RGBA")
@@ -632,7 +668,6 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             img.paste(logo, (int(logo_x), int(logo_y)), logo)
         except: pass
             
-    # 5. Adres Yazısı Yerleşimi
     if dealer_address:
         try:
             font = ImageFont.load_default()
