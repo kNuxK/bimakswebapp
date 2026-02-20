@@ -37,7 +37,7 @@ except ImportError:
     except ImportError:
         HAS_PYPDF = False
 
-# YENİ V 113.0: PDF Canlı Önizleme Kütüphanesi
+# PDF Canlı Önizleme Kütüphanesi
 try:
     import fitz 
     HAS_PYMUPDF = True
@@ -515,9 +515,10 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
-# --- YENİ V 113.0: BAYİ SDS/TDS MASKELEME MOTORU (KURŞUN GEÇİRMEZ) ---
+# --- YENİ V 114.0: BAYİ SDS/TDS MASKELEME MOTORU (4 EKSENLİ) ---
 def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
-                      top_mask_y, top_mask_h, bot_mask_y, bot_mask_h, 
+                      top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
+                      bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                       logo_x, logo_y, logo_w, addr_x, addr_y, lang_code):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
     try:
@@ -526,8 +527,7 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
         
         packet = io.BytesIO()
         
-        # PDF boyutunu güvenli okuma mantığı
-        width, height = 595.27, 841.89 # Standart A4 yedeği
+        width, height = 595.27, 841.89
         try:
             first_page = original_pdf.pages[0] if hasattr(original_pdf, "pages") else original_pdf.getPage(0)
             mbox = first_page.mediabox if hasattr(first_page, "mediabox") else first_page.mediaBox
@@ -537,15 +537,15 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             
         c = canvas.Canvas(packet, pagesize=(width, height))
         
-        # 1. Üst Bembeyaz Bant
-        if top_mask_h > 0:
+        # 1. Üst Bembeyaz Bant (X, Y, Genişlik, Yükseklik)
+        if top_mask_h > 0 and top_mask_w > 0:
             c.setFillColorRGB(1, 1, 1)
-            c.rect(0, height - top_mask_y - top_mask_h, width, top_mask_h, fill=1, stroke=0)
+            c.rect(top_mask_x, height - top_mask_y - top_mask_h, top_mask_w, top_mask_h, fill=1, stroke=0)
             
-        # 2. Alt Bembeyaz Bant
-        if bot_mask_h > 0:
+        # 2. Alt Bembeyaz Bant (X, Y, Genişlik, Yükseklik)
+        if bot_mask_h > 0 and bot_mask_w > 0:
             c.setFillColorRGB(1, 1, 1)
-            c.rect(0, height - bot_mask_y - bot_mask_h, width, bot_mask_h, fill=1, stroke=0)
+            c.rect(bot_mask_x, height - bot_mask_y - bot_mask_h, bot_mask_w, bot_mask_h, fill=1, stroke=0)
         
         # 3. Bayi Logosunu Çiz
         if dealer_logo_bytes:
@@ -574,7 +574,6 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
         overlay_pdf = PdfReader(packet)
         overlay_page = overlay_pdf.pages[0] if hasattr(overlay_pdf, "pages") else overlay_pdf.getPage(0)
         
-        # Tüm sayfalara uygulama döngüsü
         pages_list = original_pdf.pages if hasattr(original_pdf, "pages") else [original_pdf.getPage(i) for i in range(original_pdf.getNumPages())]
         
         for page in pages_list:
@@ -591,24 +590,23 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
     except Exception as e:
         return None
 
-# --- YENİ V 113.0: GÖRSEL CANLI ÖNİZLEME MOTORU ---
+# --- YENİ V 114.0: GÖRSEL CANLI ÖNİZLEME MOTORU (4 EKSENLİ) ---
 def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
-                         top_mask_y, top_mask_h, bot_mask_y, bot_mask_h, 
+                         top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
+                         bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                          logo_x, logo_y, logo_w, addr_x, addr_y):
-    width, height = 595, 842 # Standart A4 Oranı
+    width, height = 595, 842 
     img = None
     
-    # 1. Eğer PyMuPDF (fitz) varsa orijinal PDF'in ilk sayfasını resme çevir
     if original_pdf_bytes and HAS_PYMUPDF:
         try:
             doc = fitz.open(stream=original_pdf_bytes, filetype="pdf")
             page = doc.load_page(0)
-            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5)) # Kaliteli render
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5)) 
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            img = img.resize((width, height), Image.Resampling.LANCZOS) # Slider'lar için standart boyuta zorla
+            img = img.resize((width, height), Image.Resampling.LANCZOS) 
         except: pass
             
-    # Eğer orijinal PDF yüklenmediyse veya kütüphane yoksa sanal kağıt oluştur
     if img is None:
         img = Image.new('RGB', (width, height), color=(240, 240, 240)) 
         draw = ImageDraw.Draw(img)
@@ -616,13 +614,13 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
     
     draw = ImageDraw.Draw(img)
     
-    # 2. Üst Maske Çizimi (Kullanıcı görsün diye hafif kırmızı çerçeveli)
-    if top_mask_h > 0:
-        draw.rectangle([0, top_mask_y, width, top_mask_y + top_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
+    # 2. Üst Maske Çizimi (X ve Genişlik eklendi)
+    if top_mask_h > 0 and top_mask_w > 0:
+        draw.rectangle([top_mask_x, top_mask_y, top_mask_x + top_mask_w, top_mask_y + top_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
         
-    # 3. Alt Maske Çizimi
-    if bot_mask_h > 0:
-        draw.rectangle([0, bot_mask_y, width, bot_mask_y + bot_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
+    # 3. Alt Maske Çizimi (X ve Genişlik eklendi)
+    if bot_mask_h > 0 and bot_mask_w > 0:
+        draw.rectangle([bot_mask_x, bot_mask_y, bot_mask_x + bot_mask_w, bot_mask_y + bot_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
     
     # 4. Logo Yerleşimi
     if dealer_logo_bytes:
