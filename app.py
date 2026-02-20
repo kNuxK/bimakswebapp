@@ -260,7 +260,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.0)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.2)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
@@ -273,7 +273,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             d_logo = st.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل"), type=['png', 'jpg', 'jpeg'])
             d_addr = st.text_area(_("3. Bayi Adresi (Aşağıya yazılacak)", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
             
-            # --- YENİ V 115.0: PDF İÇİ METİN BUL VE DEĞİŞTİR SİSTEMİ ---
             text_replacements = []
             
             if doc_type == "SDS":
@@ -293,46 +292,87 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     old_sup = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA VE GIDA DIŞ TİCARET LTD. ŞTİ.", key="or_p3")
                     new_sup = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Tedarikçi", key="nw_p3")
                     
-                    st.markdown("**4. Başvurulacak Kişi**")
+                    st.markdown("**4. Tedarikçi Adresi**")
+                    old_add = c_r1.text_input("Bulunacak Kelime", "Fatih Sultan Mehmet Mahallesi Şiir Sokak. No: 10 İç Kapı No: 1 Ümraniye/ İSTANBUL", key="or_p_add")
+                    new_add = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Adres", key="nw_p_add")
+
+                    st.markdown("**5. Tedarikçi Tel**")
+                    old_tel_sup = c_r1.text_input("Bulunacak Kelime", "Tel: 0 850 522 71 04", key="or_p_tel_sup")
+                    new_tel_sup = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Tel", key="nw_p_tel_sup")
+
+                    st.markdown("**6. Tedarikçi Fax**")
+                    old_fax = c_r1.text_input("Bulunacak Kelime", "Fax: 0216 321 32 13", key="or_p_fax")
+                    new_fax = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Fax", key="nw_p_fax")
+
+                    st.markdown("**7. Tedarikçi E-mail**")
+                    old_mail = c_r1.text_input("Bulunacak Kelime", "E-mail: info@bimakskimya.com", key="or_p_mail")
+                    new_mail = c_r2.text_input("Bununla Değiştir", placeholder="Yeni E-mail", key="nw_p_mail")
+
+                    st.markdown("**8. Tedarikçi Web**")
+                    old_web = c_r1.text_input("Bulunacak Kelime", "Web: www.bimakskimya.com", key="or_p_web")
+                    new_web = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Web", key="nw_p_web")
+
+                    st.markdown("**9. Başvurulacak Kişi**")
                     old_per = c_r1.text_input("Bulunacak Kelime", "AYŞE ARPACI, ROY KARASU", key="or_p4")
                     new_per = c_r2.text_input("Bununla Değiştir", placeholder="Yeni İletişim Kişisi", key="nw_p4")
                     
-                    st.markdown("**5. Acil Durum Telefonu**")
+                    st.markdown("**10. Acil Durum Telefonu**")
                     old_tel = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA: 0 850 522 71 04", key="or_p5")
-                    new_tel = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Telefon Numarası", key="nw_p5")
+                    new_tel = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Acil Durum Numarası", key="nw_p5")
+
+                    # V 115.2 - YENİ EKLENEN 3 ALAN (Tarihler ve Versiyon)
+                    st.markdown("**11. Oluşturma Tarihi**")
+                    old_cdate = c_r1.text_input("Bulunacak Kelime", "Oluşturma Tarihi: 24.02.2020", key="or_p_cdate")
+                    new_cdate = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Oluşturma Tarihi: 15.06.2024", key="nw_p_cdate")
+
+                    st.markdown("**12. Revizyon Tarihi**")
+                    old_rdate = c_r1.text_input("Bulunacak Kelime", "Revizyon Tarihi: -", key="or_p_rdate")
+                    new_rdate = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Revizyon Tarihi: 20.08.2025", key="nw_p_rdate")
+
+                    st.markdown("**13. Versiyon**")
+                    old_vers = c_r1.text_input("Bulunacak Kelime", "Versiyon: 00", key="or_p_vers")
+                    new_vers = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Versiyon: 01", key="nw_p_vers")
                     
                     if new_prod: text_replacements.append((old_prod, new_prod))
                     if new_chem: text_replacements.append((old_chem, new_chem))
                     if new_sup: text_replacements.append((old_sup, new_sup))
+                    if new_add: text_replacements.append((old_add, new_add))
+                    if new_tel_sup: text_replacements.append((old_tel_sup, new_tel_sup))
+                    if new_fax: text_replacements.append((old_fax, new_fax))
+                    if new_mail: text_replacements.append((old_mail, new_mail))
+                    if new_web: text_replacements.append((old_web, new_web))
                     if new_per: text_replacements.append((old_per, new_per))
                     if new_tel: text_replacements.append((old_tel, new_tel))
+                    if new_cdate: text_replacements.append((old_cdate, new_cdate))
+                    if new_rdate: text_replacements.append((old_rdate, new_rdate))
+                    if new_vers: text_replacements.append((old_vers, new_vers))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
                 st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
                 
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
                 ct1, ct2, ct3, ct4 = st.columns(4)
-                top_mask_x = ct1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_tm_x")
+                top_mask_x = ct1.slider("X (Sağ-Sol)", 0, 595, 357, key=f"{doc_type}_tm_x")
                 top_mask_y = ct2.slider("Y (Yukarı-Aşağı)", 0, 300, 0, key=f"{doc_type}_tm_y")
                 top_mask_w = ct3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_tm_w")
-                top_mask_h = ct4.slider("Yükseklik", 0, 300, 110, key=f"{doc_type}_tm_h")
+                top_mask_h = ct4.slider("Yükseklik", 0, 300, 46, key=f"{doc_type}_tm_h")
                 
                 st.markdown("**2. Alt Beyaz Maske (Eski Adresi Gizler)**")
                 cb1, cb2, cb3, cb4 = st.columns(4)
                 bot_mask_x = cb1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_bm_x")
-                bot_mask_y = cb2.slider("Y (Yukarı-Aşağı)", 500, 842, 760, key=f"{doc_type}_bm_y")
+                bot_mask_y = cb2.slider("Y (Yukarı-Aşağı)", 500, 842, 786, key=f"{doc_type}_bm_y")
                 bot_mask_w = cb3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_bm_w")
-                bot_mask_h = cb4.slider("Yükseklik", 0, 300, 82, key=f"{doc_type}_bm_h")
+                bot_mask_h = cb4.slider("Yükseklik", 0, 300, 105, key=f"{doc_type}_bm_h")
                 
                 st.markdown("**3. Yeni Logo Konumu**")
                 c_l1, c_l2, c_l3 = st.columns(3)
-                logo_x = c_l1.slider("Logo X (Sağ-Sol)", 0, 500, 40, key=f"{doc_type}_lx")
-                logo_y = c_l2.slider("Logo Y (Yukarı-Aşağı)", 0, 300, 20, key=f"{doc_type}_ly")
-                logo_w = c_l3.slider("Logo Büyüklüğü", 50, 400, 150, key=f"{doc_type}_lw")
+                logo_x = c_l1.slider("Logo X (Sağ-Sol)", 0, 500, 386, key=f"{doc_type}_lx")
+                logo_y = c_l2.slider("Logo Y (Yukarı-Aşağı)", 0, 300, 8, key=f"{doc_type}_ly")
+                logo_w = c_l3.slider("Logo Büyüklüğü", 50, 400, 174, key=f"{doc_type}_lw")
                 
                 st.markdown("**4. Yeni Adres Konumu**")
                 c_a1, c_a2 = st.columns(2)
-                addr_x = c_a1.slider("Adres X (Sağ-Sol)", 0, 500, 40, key=f"{doc_type}_ax")
+                addr_x = c_a1.slider("Adres X (Sağ-Sol)", 0, 500, 80, key=f"{doc_type}_ax")
                 addr_y = c_a2.slider("Adres Y (Yukarı-Aşağı)", 500, 842, 790, key=f"{doc_type}_ay")
 
             st.markdown("---")
@@ -347,7 +387,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                             bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                             logo_x, logo_y, logo_w, addr_x, addr_y, 
                             st.session_state['lang'],
-                            text_replacements # Yeni metin değiştirme modülü
+                            text_replacements 
                         )
                         if pdf_out:
                             st.success(f"İşlem Başarılı! {doc_type} bütün sayfalara uygulandı.")
@@ -367,7 +407,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                 bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                 logo_x, logo_y, logo_w, addr_x, addr_y,
-                text_replacements # Önizleme anında metinler değişsin diye eklendi
+                text_replacements 
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
