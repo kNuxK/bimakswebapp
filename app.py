@@ -389,7 +389,6 @@ elif st.session_state.get('show_settings'):
             ap = st.text_input(_("Admin Şifresi", "Admin Password", "Пароль администратора", "كلمة مرور المسؤول"), type="password")
             if ap == "opop0":
                 
-                # --- YENİ KULLANICI YÖNETİMİ PANELİ (V 110.0) ---
                 st.markdown("---")
                 st.subheader(_("👥 Kullanıcı Yönetimi", "👥 User Management", "👥 Управление пользователями", "👥 إدارة المستخدمين"))
                 
@@ -421,7 +420,6 @@ elif st.session_state.get('show_settings'):
                                 s, m = logic.register_user(n_u, n_p)
                                 if s: st.success(f"'{n_u}' başarıyla oluşturuldu!"); time.sleep(1); st.rerun()
                                 else: st.error(m)
-                # ------------------------------------------------
                 
                 st.markdown("---")
                 st.subheader(t('set_logo'))
@@ -527,11 +525,24 @@ elif st.session_state.get('active_tab') == t('btn_quote') and not st.session_sta
         st.session_state['quote_items'].append(new_item)
         st.rerun()
     
+    # YENİ V 111.0: EKLENEN ÜRÜNLERİ SİLMEDEN DÜZENLEME MOTORU EKLENDİ
     if st.session_state['quote_items']:
+        st.markdown("---")
+        st.markdown(_("**📝 Eklenen Ürünler (Düzenleyebilirsiniz)**", "**📝 Added Items (Editable)**", "**📝 Добавленные товары (можно редактировать)**", "**📝 العناصر المضافة (قابلة للتعديل)**"))
+        
         for i, it in enumerate(st.session_state['quote_items']):
-            col_i, col_d = st.columns([9,1])
-            col_i.text(f"{it['name']} - {it['qty']} {it['unit']} x {it['price']} = {it['qty']*it['price']:,.2f}")
-            if col_d.button("X", key=f"del_{i}"): st.session_state['quote_items'].pop(i); st.rerun()
+            c_ed1, c_ed2, c_ed3, c_ed4, c_ed5, c_ed6 = st.columns([3, 1.5, 1, 1, 1.5, 0.5])
+            
+            st.session_state['quote_items'][i]['name'] = c_ed1.text_input("Ürün", value=it['name'], key=f"ed_n_{i}", label_visibility="collapsed")
+            st.session_state['quote_items'][i]['pkg'] = c_ed2.text_input("Ambalaj", value=it['pkg'], key=f"ed_k_{i}", label_visibility="collapsed")
+            st.session_state['quote_items'][i]['qty'] = c_ed3.number_input("Adet", value=float(it['qty']), key=f"ed_q_{i}", label_visibility="collapsed")
+            st.session_state['quote_items'][i]['unit'] = c_ed4.text_input("Birim", value=it['unit'], key=f"ed_u_{i}", label_visibility="collapsed")
+            st.session_state['quote_items'][i]['price'] = c_ed5.number_input("Fiyat", value=float(it['price']), key=f"ed_p_{i}", label_visibility="collapsed")
+            
+            if c_ed6.button("X", key=f"del_{i}"):
+                st.session_state['quote_items'].pop(i)
+                st.rerun()
+                
         q_show_total = st.checkbox(t('q_show_total'), value=True)
         q_note = st.text_area(t('q_note_label'))
         if st.button(t('q_create')):
