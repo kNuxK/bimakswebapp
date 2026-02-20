@@ -508,7 +508,7 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
-# --- YENİ V 112.0: BAYİ SDS/TDS MASKELEME MOTORU ---
+# --- YENİ V 112.1: BAYİ SDS/TDS MASKELEME MOTORU (KURŞUN GEÇİRMEZ) ---
 def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, mask_h, lang_code):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
     try:
@@ -516,29 +516,33 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, mas
         writer = PdfWriter()
         
         packet = io.BytesIO()
-        first_page = original_pdf.pages[0]
-        width = float(first_page.mediabox.width)
-        height = float(first_page.mediabox.height)
+        first_page = original_pdf.pages[0] if hasattr(original_pdf, "pages") else original_pdf.getPage(0)
         
+        # Sürüm bağımsız PDF genişlik/yükseklik hesabı (AttributeError'ı çözer)
+        try:
+            mbox = first_page.mediabox if hasattr(first_page, "mediabox") else first_page.mediaBox
+            width = float(mbox.width) if hasattr(mbox, "width") else (float(mbox.getWidth()) if hasattr(mbox, "getWidth") else float(mbox[2]))
+            height = float(mbox.height) if hasattr(mbox, "height") else (float(mbox.getHeight()) if hasattr(mbox, "getHeight") else float(mbox[3]))
+        except:
+            width, height = 595.27, 841.89 # Standart A4
+            
         c = canvas.Canvas(packet, pagesize=(width, height))
         
-        # 1. Bembeyaz Bant (Eski logoyu ve adresi gizler)
+        # 1. Bembeyaz Bant
         c.setFillColorRGB(1, 1, 1)
         c.rect(0, height - mask_h, width, mask_h, fill=1, stroke=0)
         
         # 2. Bayi Logosunu Çiz
         if dealer_logo_bytes:
             logo_img = ImageReader(io.BytesIO(dealer_logo_bytes))
-            # Sola, maskenin içine orantılı yerleştir
             c.drawImage(logo_img, 40, height - mask_h + 15, width=150, height=mask_h - 30, preserveAspectRatio=True, mask='auto')
         
         # 3. Bayi Adresini Yaz
         if dealer_address:
             f_reg = register_embedded_font() or "Helvetica"
             c.setFont(f_reg, 9)
-            c.setFillColorRGB(0, 0, 0) # Siyah renk
-            
-            txt = c.beginText(220, height - 30) # Adres yazısının başlayacağı koordinat (logonun sağı)
+            c.setFillColorRGB(0, 0, 0) 
+            txt = c.beginText(220, height - 30) 
             for line in dealer_address.split('\n'):
                 txt.textLine(line[:100])
             c.drawText(txt)
@@ -546,10 +550,12 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, mas
         c.save()
         packet.seek(0)
         overlay_pdf = PdfReader(packet)
-        overlay_page = overlay_pdf.pages[0]
+        overlay_page = overlay_pdf.pages[0] if hasattr(overlay_pdf, "pages") else overlay_pdf.getPage(0)
         
-        # 4. Bu Beyaz Bantlı Overlay'i Orijinal PDF'in BÜTÜN SAYFALARINA Zımbala
-        for page in original_pdf.pages:
+        # Tüm sayfalara uygulama döngüsü (Sürüm bağımsız)
+        pages_list = original_pdf.pages if hasattr(original_pdf, "pages") else [original_pdf.getPage(i) for i in range(original_pdf.getNumPages())]
+        
+        for page in pages_list:
             if hasattr(page, "merge_page"):
                 page.merge_page(overlay_page)
             elif hasattr(page, "mergePage"):
@@ -561,4 +567,40 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, mas
         output.seek(0)
         return output
     except Exception as e:
+        # Hata durumunda none döner
         return None
+
+# --- YENİ V 112.1: GÖRSEL CANLI ÖNİZLEME MOTORU ---
+def generate_sds_preview(dealer_logo_bytes, dealer_address, mask_h):
+    width, height = 595, 842 # A4 Piksel Standartı
+    img = Image.new('RGB', (width, height), color=(240, 240, 240)) 
+    draw = ImageDraw.Draw(img)
+    
+    # Orijinal PDF hissi vermek için silik yazılar
+    draw.text((40, height - 50), "ORIJINAL PDF ICERIGI (GIZLENECEK ALAN)", fill=(200, 200, 200))
+    draw.text((40, 400), "ORIJINAL PDF ICERIGI (ALTTA GORUNECEK ALAN)", fill=(200, 200, 200))
+    
+    # 1. Maske (Kırmızı çerçeveli beyaz alan)
+    draw.rectangle([0, 0, width, mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
+    
+    # 2. Logo Yerleşimi (PIL koordinatları yukarıdan aşağı iner)
+    if dealer_logo_bytes:
+        try:
+            logo = Image.open(io.BytesIO(dealer_logo_bytes)).convert("RGBA")
+            logo.thumbnail((150, mask_h - 30))
+            y_offset = (mask_h - logo.height) // 2
+            img.paste(logo, (40, y_offset), logo)
+        except: pass
+            
+    # 3. Adres Yazısı Yerleşimi
+    if dealer_address:
+        try:
+            font = ImageFont.load_default()
+            y_text = 30 
+            x_text = 220
+            for line in dealer_address.split('\n'):
+                draw.text((x_text, y_text), line[:100], fill=(0, 0, 0), font=font)
+                y_text += 12 
+        except: pass
+            
+    return img
