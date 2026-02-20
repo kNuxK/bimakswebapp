@@ -6,3 +6,4 @@ reportlab
 pypdf
 gspread
 google-auth
+PyMuPDF
