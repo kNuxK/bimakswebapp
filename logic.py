@@ -9,6 +9,7 @@ import base64
 import math
 import hashlib
 import gspread
+import textwrap
 from google.oauth2.service_account import Credentials
 import streamlit as st 
 from datetime import datetime
@@ -126,7 +127,6 @@ def delete_user(target_username):
             row_idx = users.index(target_username) + 1
             if row_idx == 1:
                 return False, "Başlık satırı silinemez!"
-            # Gspread sürümüne göre delete_rows veya delete_row çağrısı
             try:
                 sheet.delete_rows(row_idx)
             except AttributeError:
@@ -449,8 +449,25 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
             q = float(it.get('qty', 1))
             line_total = p * q
             grand_total += line_total
-            c.drawString(40, y, it['name'][:40]); c.drawString(220, y, it['pkg'][:15]); c.drawString(450, y, f"{p:,.2f}")
+            
+            # YENİ V 111.0: UZUN ÜRÜN İSİMLERİNİ KAYDIRMA MOTORU (TEXTWRAP)
+            name_text = str(it.get('name', ''))
+            wrapped_name = textwrap.wrap(name_text, width=35) # Ürün ismi alanını 35 karakterde bir alt satıra böler
+            if not wrapped_name: wrapped_name = [""]
+            
+            # İlk satırı ambalaj ve fiyat ile birlikte yaz
+            c.drawString(40, y, wrapped_name[0])
+            c.drawString(220, y, str(it.get('pkg', ''))[:15])
+            c.drawString(450, y, f"{p:,.2f}")
             y -= 15
+            
+            # Eğer ürün ismi uzun olduğu için 2 veya 3 satıra bölünmüşse, sadece ürün ismini alt satırlara yazmaya devam et
+            if len(wrapped_name) > 1:
+                for extra_line in wrapped_name[1:]:
+                    c.drawString(40, y, extra_line)
+                    y -= 15
+                    
+            y -= 5 # Bir sonraki ürüne geçmeden araya küçük bir estetik boşluk bırak
         except: continue
     
     if show_total: 
