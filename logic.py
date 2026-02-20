@@ -38,7 +38,7 @@ except ImportError:
         HAS_PYPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 110.0)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA
 # ==============================================================================
 
 def get_gsheets_client():
@@ -108,7 +108,6 @@ def update_user_keys(username, genai, li, insta, insta_id):
         st.error(f"Güncelleme Hatası: {e}")
         return False
 
-# --- YENİ ADMİN KULLANICI YÖNETİMİ FONKSİYONLARI ---
 def get_all_users():
     sheet = get_db_sheet()
     if not sheet: return []
@@ -450,24 +449,21 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
             line_total = p * q
             grand_total += line_total
             
-            # YENİ V 111.0: UZUN ÜRÜN İSİMLERİNİ KAYDIRMA MOTORU (TEXTWRAP)
             name_text = str(it.get('name', ''))
-            wrapped_name = textwrap.wrap(name_text, width=35) # Ürün ismi alanını 35 karakterde bir alt satıra böler
+            wrapped_name = textwrap.wrap(name_text, width=35) 
             if not wrapped_name: wrapped_name = [""]
             
-            # İlk satırı ambalaj ve fiyat ile birlikte yaz
             c.drawString(40, y, wrapped_name[0])
             c.drawString(220, y, str(it.get('pkg', ''))[:15])
             c.drawString(450, y, f"{p:,.2f}")
             y -= 15
             
-            # Eğer ürün ismi uzun olduğu için 2 veya 3 satıra bölünmüşse, sadece ürün ismini alt satırlara yazmaya devam et
             if len(wrapped_name) > 1:
                 for extra_line in wrapped_name[1:]:
                     c.drawString(40, y, extra_line)
                     y -= 15
                     
-            y -= 5 # Bir sonraki ürüne geçmeden araya küçük bir estetik boşluk bırak
+            y -= 5 
         except: continue
     
     if show_total: 
@@ -511,3 +507,58 @@ def resize_for_instagram(image):
     img = image.resize((base_width, h_size), Image.Resampling.LANCZOS)
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
+
+# --- YENİ V 112.0: BAYİ SDS/TDS MASKELEME MOTORU ---
+def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, mask_h, lang_code):
+    if not HAS_PYPDF or not HAS_REPORTLAB: return None
+    try:
+        original_pdf = PdfReader(io.BytesIO(original_pdf_bytes))
+        writer = PdfWriter()
+        
+        packet = io.BytesIO()
+        first_page = original_pdf.pages[0]
+        width = float(first_page.mediabox.width)
+        height = float(first_page.mediabox.height)
+        
+        c = canvas.Canvas(packet, pagesize=(width, height))
+        
+        # 1. Bembeyaz Bant (Eski logoyu ve adresi gizler)
+        c.setFillColorRGB(1, 1, 1)
+        c.rect(0, height - mask_h, width, mask_h, fill=1, stroke=0)
+        
+        # 2. Bayi Logosunu Çiz
+        if dealer_logo_bytes:
+            logo_img = ImageReader(io.BytesIO(dealer_logo_bytes))
+            # Sola, maskenin içine orantılı yerleştir
+            c.drawImage(logo_img, 40, height - mask_h + 15, width=150, height=mask_h - 30, preserveAspectRatio=True, mask='auto')
+        
+        # 3. Bayi Adresini Yaz
+        if dealer_address:
+            f_reg = register_embedded_font() or "Helvetica"
+            c.setFont(f_reg, 9)
+            c.setFillColorRGB(0, 0, 0) # Siyah renk
+            
+            txt = c.beginText(220, height - 30) # Adres yazısının başlayacağı koordinat (logonun sağı)
+            for line in dealer_address.split('\n'):
+                txt.textLine(line[:100])
+            c.drawText(txt)
+            
+        c.save()
+        packet.seek(0)
+        overlay_pdf = PdfReader(packet)
+        overlay_page = overlay_pdf.pages[0]
+        
+        # 4. Bu Beyaz Bantlı Overlay'i Orijinal PDF'in BÜTÜN SAYFALARINA Zımbala
+        for page in original_pdf.pages:
+            if hasattr(page, "merge_page"):
+                page.merge_page(overlay_page)
+            elif hasattr(page, "mergePage"):
+                page.mergePage(overlay_page)
+            writer.add_page(page)
+            
+        output = io.BytesIO()
+        writer.write(output)
+        output.seek(0)
+        return output
+    except Exception as e:
+        return None
