@@ -260,74 +260,87 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 113.0)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 114.0)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
-        st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu ve adresinizi istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية."))
+        
+        # --- YENİ V 114.0 BELGE TÜRÜ SEÇİMİ ---
+        doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
+        
+        st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية."))
         
         c_p1, c_p2 = st.columns([1, 1])
         
         with c_p1:
-            sds_file = st.file_uploader(_("1. Orijinal SDS/TDS (PDF)", "1. Original SDS/TDS (PDF)", "1. Оригинальный SDS/TDS", "1. SDS/TDS الأصلي"), type=['pdf'])
+            # Seçilen Belge Türüne Göre Etiketler Otomatik Değişir
+            sds_file = st.file_uploader(_(f"1. Orijinal {doc_type} (PDF)", f"1. Original {doc_type} (PDF)", f"1. Оригинальный {doc_type}", f"1. {doc_type} الأصلي"), type=['pdf'])
             d_logo = st.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل"), type=['png', 'jpg', 'jpeg'])
             d_addr = st.text_area(_("3. Bayi Adresi (Aşağıya yazılacak)", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
             
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
-                st.caption("PDF üzerindeki öğelerin yerlerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
+                st.caption("PDF üzerindeki öğelerin ve beyaz maskelerin yerlerini X (Sağ-Sol), Y (Yukarı-Aşağı), Genişlik ve Yükseklik olarak ayarlayın.")
                 
+                # V 114.0 - 4 EKSENLİ ÜST MASKE
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
-                c_m1, c_m2 = st.columns(2)
-                top_mask_y = c_m1.slider("Üst Maske Başlangıç (Y)", 0, 300, 0)
-                top_mask_h = c_m2.slider("Üst Maske Yüksekliği", 0, 300, 110)
+                ct1, ct2, ct3, ct4 = st.columns(4)
+                top_mask_x = ct1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_tm_x")
+                top_mask_y = ct2.slider("Y (Yukarı-Aşağı)", 0, 300, 0, key=f"{doc_type}_tm_y")
+                top_mask_w = ct3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_tm_w")
+                top_mask_h = ct4.slider("Yükseklik", 0, 300, 110, key=f"{doc_type}_tm_h")
                 
+                # V 114.0 - 4 EKSENLİ ALT MASKE
                 st.markdown("**2. Alt Beyaz Maske (Eski Adresi Gizler)**")
-                c_m3, c_m4 = st.columns(2)
-                bot_mask_y = c_m3.slider("Alt Maske Başlangıç (Y)", 500, 842, 760)
-                bot_mask_h = c_m4.slider("Alt Maske Yüksekliği", 0, 300, 82)
+                cb1, cb2, cb3, cb4 = st.columns(4)
+                bot_mask_x = cb1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_bm_x")
+                bot_mask_y = cb2.slider("Y (Yukarı-Aşağı)", 500, 842, 760, key=f"{doc_type}_bm_y")
+                bot_mask_w = cb3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_bm_w")
+                bot_mask_h = cb4.slider("Yükseklik", 0, 300, 82, key=f"{doc_type}_bm_h")
                 
                 st.markdown("**3. Yeni Logo Konumu**")
                 c_l1, c_l2, c_l3 = st.columns(3)
-                logo_x = c_l1.slider("Logo X (Sağ-Sol)", 0, 500, 40)
-                logo_y = c_l2.slider("Logo Y (Yukarı-Aşağı)", 0, 300, 20)
-                logo_w = c_l3.slider("Logo Büyüklüğü (Genişlik)", 50, 400, 150)
+                logo_x = c_l1.slider("Logo X (Sağ-Sol)", 0, 500, 40, key=f"{doc_type}_lx")
+                logo_y = c_l2.slider("Logo Y (Yukarı-Aşağı)", 0, 300, 20, key=f"{doc_type}_ly")
+                logo_w = c_l3.slider("Logo Büyüklüğü", 50, 400, 150, key=f"{doc_type}_lw")
                 
                 st.markdown("**4. Yeni Adres Konumu**")
                 c_a1, c_a2 = st.columns(2)
-                addr_x = c_a1.slider("Adres X (Sağ-Sol)", 0, 500, 40)
-                addr_y = c_a2.slider("Adres Y (Yukarı-Aşağı)", 500, 842, 790)
+                addr_x = c_a1.slider("Adres X (Sağ-Sol)", 0, 500, 40, key=f"{doc_type}_ax")
+                addr_y = c_a2.slider("Adres Y (Yukarı-Aşağı)", 500, 842, 790, key=f"{doc_type}_ay")
 
             st.markdown("---")
-            if st.button(_("✅ Onayla ve PDF'i Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
+            if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
                 if sds_file:
-                    with st.spinner("PDF Maskeleniyor ve Oluşturuluyor..."):
+                    with st.spinner(f"{doc_type} Maskeleniyor ve Oluşturuluyor..."):
                         pdf_out = logic.create_dealer_pdf(
                             sds_file.getvalue(), 
                             d_logo.getvalue() if d_logo else None, 
                             d_addr, 
-                            top_mask_y, top_mask_h, bot_mask_y, bot_mask_h, 
+                            top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
+                            bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                             logo_x, logo_y, logo_w, addr_x, addr_y, 
                             st.session_state['lang']
                         )
                         if pdf_out:
-                            st.success("İşlem Başarılı! Bütün sayfalara uygulandı.")
-                            st.download_button("📥 İndir / Download", data=pdf_out, file_name="Bayi_SDS_TDS.pdf", mime="application/pdf")
+                            st.success(f"İşlem Başarılı! {doc_type} bütün sayfalara uygulandı.")
+                            st.download_button("📥 İndir / Download", data=pdf_out, file_name=f"Bayi_{doc_type}.pdf", mime="application/pdf")
                         else:
                             st.error("HATA: PDF işlenemedi. Orijinal belgede bir sorun olabilir.")
                 else:
-                    st.warning("Lütfen orijinal PDF dosyasını yükleyin.")
+                    st.warning(f"Lütfen orijinal {doc_type} dosyasını yükleyin.")
                     
         with c_p2:
-            st.markdown(_("**👀 Canlı Önizleme (Yüklediğiniz PDF)**", "**👀 Live Preview**", "**👀 Предварительный просмотр**", "**👀 معاينة حية**"))
+            st.markdown(_(f"**👀 Canlı Önizleme (Yüklediğiniz {doc_type})**", "**👀 Live Preview**", "**👀 Предварительный просмотр**", "**👀 معاينة حية**"))
             
             # Canlı Önizlemeyi Oluştur
             preview_img = logic.generate_sds_preview(
                 sds_file.getvalue() if sds_file else None,
                 d_logo.getvalue() if d_logo else None, 
                 d_addr, 
-                top_mask_y, top_mask_h, bot_mask_y, bot_mask_h, 
+                top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
+                bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                 logo_x, logo_y, logo_w, addr_x, addr_y
             )
-            st.image(preview_img, caption="Sanal A4 Önizlemesi (Orijinal Belgeniz)", use_container_width=True)
+            st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
 # 2. LINKEDIN
 elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_state.get('show_settings'):
