@@ -515,30 +515,51 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
-# --- YENİ V 115.3: PDF İÇİ METİN DEĞİŞTİRME & LİNK TEMİZLEYİCİ MOTOR ---
-def replace_text_in_pdf_bytes(pdf_bytes, replacements):
-    if not HAS_PYMUPDF or not pdf_bytes or not replacements:
+# --- YENİ V 116.0: İKİ YÖNLÜ METİN MOTORU (AKILLI SATIR & TAM EŞLEŞME) ---
+def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacements=None):
+    if not HAS_PYMUPDF or not pdf_bytes:
         return pdf_bytes
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         for page in doc:
-            # 1. Tıklanabilir (mavi/altı çizili) tüm linkleri PDF'ten tamamen siliyoruz (Link Killer)
+            # 1. Tıklanabilir linkleri kökten siler (Link Killer)
             try:
                 for link in page.get_links():
                     page.delete_link(link)
             except:
                 pass
                 
-            # 2. Metinleri bul ve bembeyaz boyayıp yenisini yaz
-            for old_text, new_text in replacements:
-                if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
-                    text_instances = page.search_for(str(old_text))
-                    for inst in text_instances:
-                        page.add_redact_annot(inst, fill=(1, 1, 1))
-                        page.apply_redactions()
-                        
-                        font_sz = inst.height * 0.85
-                        page.insert_text((inst.x0, inst.y1 - (inst.height * 0.15)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
+            # 2. AKILLI SATIR YAKALAYICI (Smart Replace)
+            if smart_replacements:
+                blocks = page.get_text("dict")["blocks"]
+                for b in blocks:
+                    if b.get('type') == 0: 
+                        for l in b.get("lines", []):
+                            line_text = "".join([s["text"] for s in l.get("spans", [])])
+                            for prefix, new_text in smart_replacements:
+                                # Satırın içinde bu başlık geçiyorsa, satırı komple bembeyaz yap ve yeni metni bas!
+                                if prefix and new_text and str(prefix) in line_text:
+                                    bbox = fitz.Rect(l["bbox"])
+                                    page.add_redact_annot(bbox, fill=(1, 1, 1))
+                                    page.apply_redactions()
+                                    
+                                    if l.get("spans"):
+                                        font_sz = l["spans"][0]["size"] * 0.90
+                                    else:
+                                        font_sz = 9
+                                    page.insert_text((bbox.x0, bbox.y1 - (bbox.height * 0.2)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
+
+            # 3. TAM EŞLEŞME (Exact Replace)
+            if exact_replacements:
+                for old_text, new_text in exact_replacements:
+                    if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
+                        text_instances = page.search_for(str(old_text))
+                        for inst in text_instances:
+                            page.add_redact_annot(inst, fill=(1, 1, 1))
+                            page.apply_redactions()
+                            
+                            font_sz = inst.height * 0.85
+                            page.insert_text((inst.x0, inst.y1 - (inst.height * 0.15)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
         
         output = io.BytesIO()
         doc.save(output)
@@ -547,15 +568,16 @@ def replace_text_in_pdf_bytes(pdf_bytes, replacements):
     except Exception as e:
         return pdf_bytes
 
-# --- YENİ V 115.1: BAYİ SDS/TDS MASKELEME MOTORU ---
+# --- YENİ V 116.0: BAYİ SDS/TDS MASKELEME MOTORU (GÜNCELLENDİ) ---
 def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
                       top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                       bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                      logo_x, logo_y, logo_w, addr_x, addr_y, lang_code, text_replacements=None):
+                      logo_x, logo_y, logo_w, addr_x, addr_y, lang_code, 
+                      exact_replacements=None, smart_replacements=None):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
     
-    if text_replacements:
-        original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, text_replacements)
+    if exact_replacements or smart_replacements:
+        original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, exact_replacements, smart_replacements)
         
     try:
         original_pdf = PdfReader(io.BytesIO(original_pdf_bytes))
@@ -622,17 +644,18 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
     except Exception as e:
         return None
 
-# --- YENİ V 115.1: GÖRSEL CANLI ÖNİZLEME MOTORU (DEĞİŞTİRİLEN METİNLERLE) ---
+# --- YENİ V 116.0: GÖRSEL CANLI ÖNİZLEME MOTORU (GÜNCELLENDİ) ---
 def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
                          top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                          bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                         logo_x, logo_y, logo_w, addr_x, addr_y, text_replacements=None):
+                         logo_x, logo_y, logo_w, addr_x, addr_y, 
+                         exact_replacements=None, smart_replacements=None):
     width, height = 595, 842 
     img = None
     
     if original_pdf_bytes and HAS_PYMUPDF:
-        if text_replacements:
-            original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, text_replacements)
+        if exact_replacements or smart_replacements:
+            original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, exact_replacements, smart_replacements)
             
         try:
             doc = fitz.open(stream=original_pdf_bytes, filetype="pdf")
