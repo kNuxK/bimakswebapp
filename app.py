@@ -260,11 +260,24 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.3)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.4)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
         st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية."))
+        
+        # V 115.4: Sağ sütunu sabit (sticky) yapma CSS Kodu
+        st.markdown("""
+            <style>
+            div[data-testid="column"]:nth-of-type(2) {
+                position: -webkit-sticky;
+                position: sticky;
+                top: 3rem;
+                z-index: 10;
+                align-self: flex-start;
+            }
+            </style>
+        """, unsafe_allow_html=True)
         
         c_p1, c_p2 = st.columns([1, 1])
         
@@ -304,7 +317,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     old_fax = c_r1.text_input("Bulunacak Kelime", "Fax: 0216 321 32 13", key="or_p_fax")
                     new_fax = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Fax", key="nw_p_fax")
 
-                    # V 115.3 - LİNK FORMATINDAN KAÇMAK İÇİN SADECE MAİL VE WEB KISMI ARATILDI
                     st.markdown("**7. Tedarikçi E-mail**")
                     old_mail = c_r1.text_input("Bulunacak Kelime", "info@bimakskimya.com", key="or_p_mail")
                     new_mail = c_r2.text_input("Bununla Değiştir", placeholder="Örn: info@bayi.com", key="nw_p_mail")
@@ -332,6 +344,11 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     st.markdown("**13. Versiyon**")
                     old_vers = c_r1.text_input("Bulunacak Kelime", "Versiyon: 00", key="or_p_vers")
                     new_vers = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Versiyon: 01", key="nw_p_vers")
+
+                    # V 115.4 - GBF YETKİLİ KİŞİ ALANI EKLENDİ
+                    st.markdown("**14. GBF Yetkili Kişi (Son Sayfa)**")
+                    old_gbf = c_r1.text_input("Bulunacak Kelime", "GBF Yetkili Kişi: ŞEVVAL GÖKÇE DENKÇİ", key="or_p_gbf")
+                    new_gbf = c_r2.text_input("Bununla Değiştir", placeholder="Örn: GBF Yetkili Kişi: YENİ İSİM", key="nw_p_gbf")
                     
                     if new_prod: text_replacements.append((old_prod, new_prod))
                     if new_chem: text_replacements.append((old_chem, new_chem))
@@ -346,11 +363,11 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     if new_cdate: text_replacements.append((old_cdate, new_cdate))
                     if new_rdate: text_replacements.append((old_rdate, new_rdate))
                     if new_vers: text_replacements.append((old_vers, new_vers))
+                    if new_gbf: text_replacements.append((old_gbf, new_gbf))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
                 st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
                 
-                # V 115.3 - YENİ VARSAYILAN (DEFAULT) KOORDİNATLAR
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
                 ct1, ct2, ct3, ct4 = st.columns(4)
                 top_mask_x = ct1.slider("X (Sağ-Sol)", 0, 595, 357, key=f"{doc_type}_tm_x")
@@ -627,7 +644,7 @@ elif st.session_state.get('show_settings'):
             with st.spinner("Veritabanına kaydediliyor..."):
                 is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
                 if is_saved:
-                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!"))
+                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ в قاعدة البيانات!"))
                 else:
                     st.error("Veritabanına kaydedilirken bir hata oluştu.")
             time.sleep(1); st.rerun()
