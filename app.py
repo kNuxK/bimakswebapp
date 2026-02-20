@@ -260,7 +260,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.4)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.5)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
@@ -345,10 +345,22 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     old_vers = c_r1.text_input("Bulunacak Kelime", "Versiyon: 00", key="or_p_vers")
                     new_vers = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Versiyon: 01", key="nw_p_vers")
 
-                    # V 115.4 - GBF YETKİLİ KİŞİ ALANI EKLENDİ
-                    st.markdown("**14. GBF Yetkili Kişi (Son Sayfa)**")
+                    # V 115.5 - SON SAYFA DETAYLARI EKLENDİ
+                    st.markdown("**14. Son Sayfa Acil Durum Tel**")
+                    old_last_tel = c_r1.text_input("Bulunacak Kelime", "ACİL DURUM TELEFON NUMARALARI: 0 850 522 71 04", key="or_p_ltel")
+                    new_last_tel = c_r2.text_input("Bununla Değiştir", placeholder="Örn: ACİL DURUM TELEFON NUMARALARI: YENİ NO", key="nw_p_ltel")
+
+                    st.markdown("**15. GBF Yetkili Kişi**")
                     old_gbf = c_r1.text_input("Bulunacak Kelime", "GBF Yetkili Kişi: ŞEVVAL GÖKÇE DENKÇİ", key="or_p_gbf")
                     new_gbf = c_r2.text_input("Bununla Değiştir", placeholder="Örn: GBF Yetkili Kişi: YENİ İSİM", key="nw_p_gbf")
+
+                    st.markdown("**16. Sertifika Geçerlilik Süresi**")
+                    old_cert_date = c_r1.text_input("Bulunacak Kelime", "Sertifika Geçerlilik Süresi: 31.12.2023", key="or_p_cval")
+                    new_cert_date = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Sertifika Geçerlilik Süresi: 01.01.2028", key="nw_p_cval")
+
+                    st.markdown("**17. Sertifika No**")
+                    old_cert_no = c_r1.text_input("Bulunacak Kelime", "Sertifika No: GBF01.60.02", key="or_p_cno")
+                    new_cert_no = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Sertifika No: YENİ-NO", key="nw_p_cno")
                     
                     if new_prod: text_replacements.append((old_prod, new_prod))
                     if new_chem: text_replacements.append((old_chem, new_chem))
@@ -363,7 +375,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     if new_cdate: text_replacements.append((old_cdate, new_cdate))
                     if new_rdate: text_replacements.append((old_rdate, new_rdate))
                     if new_vers: text_replacements.append((old_vers, new_vers))
+                    if new_last_tel: text_replacements.append((old_last_tel, new_last_tel))
                     if new_gbf: text_replacements.append((old_gbf, new_gbf))
+                    if new_cert_date: text_replacements.append((old_cert_date, new_cert_date))
+                    if new_cert_no: text_replacements.append((old_cert_no, new_cert_no))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
                 st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
