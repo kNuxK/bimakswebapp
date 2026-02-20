@@ -260,13 +260,12 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.5)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 116.0 - AKILLI SATIR DEĞİŞTİRİCİ)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
         st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية."))
         
-        # V 115.4: Sağ sütunu sabit (sticky) yapma CSS Kodu
         st.markdown("""
             <style>
             div[data-testid="column"]:nth-of-type(2) {
@@ -286,101 +285,90 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             d_logo = st.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل"), type=['png', 'jpg', 'jpeg'])
             d_addr = st.text_area(_("3. Bayi Adresi (Aşağıya yazılacak)", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
             
-            text_replacements = []
+            exact_replacements = []
+            smart_replacements = []
             
             if doc_type == "SDS":
-                with st.expander("📝 Belge İçi Metin Değiştirme (Find & Replace)", expanded=True):
-                    st.caption("Aşağıdaki alanlar PDF içindeki o kelimeleri bulup, tam yerlerine yenisini yazar. Canlı Önizlemede anında görebilirsiniz.")
+                # --- MENÜ 1: TAM EŞLEŞME (Eski Değeri Girmek Gerekir) ---
+                with st.expander("📝 1. Tam Eşleşmeli Değişiklikler (Eski değeri girmeniz gerekir)", expanded=False):
+                    st.caption("Bu bölümdeki metinler PDF'in herhangi bir yerinde (cümle içinde vb.) geçebileceği için tam olarak eski kelimeyi yazmanız gereklidir.")
                     
                     c_r1, c_r2 = st.columns(2)
-                    st.markdown("**1. Ürün Adı (Maks 132 vs.)**")
+                    st.markdown("**Ürün Adı (Örn: Maks 132 vs.)**")
                     old_prod = c_r1.text_input("Bulunacak Kelime", "MAKS 132", key="or_p1")
                     new_prod = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Ürün Adı", key="nw_p1")
                     
-                    st.markdown("**2. Kimyasal Adı**")
+                    st.markdown("**Kimyasal Adı**")
                     old_chem = c_r1.text_input("Bulunacak Kelime", "TEMİZLEME ÜRÜNÜ", key="or_p2")
                     new_chem = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Kimyasal Adı", key="nw_p2")
                     
-                    st.markdown("**3. Tedarikçi Bilgisi**")
+                    st.markdown("**Tedarikçi Bilgisi**")
                     old_sup = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA VE GIDA DIŞ TİCARET LTD. ŞTİ.", key="or_p3")
                     new_sup = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Tedarikçi", key="nw_p3")
                     
-                    st.markdown("**4. Tedarikçi Adresi**")
+                    st.markdown("**Açık Adres Satırı**")
                     old_add = c_r1.text_input("Bulunacak Kelime", "Fatih Sultan Mehmet Mahallesi Şiir Sokak. No: 10 İç Kapı No: 1 Ümraniye/ İSTANBUL", key="or_p_add")
                     new_add = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Adres", key="nw_p_add")
 
-                    st.markdown("**5. Tedarikçi Tel**")
-                    old_tel_sup = c_r1.text_input("Bulunacak Kelime", "Tel: 0 850 522 71 04", key="or_p_tel_sup")
-                    new_tel_sup = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Tel", key="nw_p_tel_sup")
-
-                    st.markdown("**6. Tedarikçi Fax**")
-                    old_fax = c_r1.text_input("Bulunacak Kelime", "Fax: 0216 321 32 13", key="or_p_fax")
-                    new_fax = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Fax", key="nw_p_fax")
-
-                    st.markdown("**7. Tedarikçi E-mail**")
-                    old_mail = c_r1.text_input("Bulunacak Kelime", "info@bimakskimya.com", key="or_p_mail")
-                    new_mail = c_r2.text_input("Bununla Değiştir", placeholder="Örn: info@bayi.com", key="nw_p_mail")
-
-                    st.markdown("**8. Tedarikçi Web**")
-                    old_web = c_r1.text_input("Bulunacak Kelime", "www.bimakskimya.com", key="or_p_web")
-                    new_web = c_r2.text_input("Bununla Değiştir", placeholder="Örn: www.bayi.com", key="nw_p_web")
-
-                    st.markdown("**9. Başvurulacak Kişi**")
+                    st.markdown("**Başvurulacak Kişi (Tablodaki İsim)**")
                     old_per = c_r1.text_input("Bulunacak Kelime", "AYŞE ARPACI, ROY KARASU", key="or_p4")
                     new_per = c_r2.text_input("Bununla Değiştir", placeholder="Yeni İletişim Kişisi", key="nw_p4")
-                    
-                    st.markdown("**10. Acil Durum Telefonu**")
-                    old_tel = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA: 0 850 522 71 04", key="or_p5")
-                    new_tel = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Acil Durum Numarası", key="nw_p5")
 
-                    st.markdown("**11. Oluşturma Tarihi**")
-                    old_cdate = c_r1.text_input("Bulunacak Kelime", "Oluşturma Tarihi: 24.02.2020", key="or_p_cdate")
-                    new_cdate = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Oluşturma Tarihi: 15.06.2024", key="nw_p_cdate")
+                    if new_prod: exact_replacements.append((old_prod, new_prod))
+                    if new_chem: exact_replacements.append((old_chem, new_chem))
+                    if new_sup: exact_replacements.append((old_sup, new_sup))
+                    if new_add: exact_replacements.append((old_add, new_add))
+                    if new_per: exact_replacements.append((old_per, new_per))
 
-                    st.markdown("**12. Revizyon Tarihi**")
-                    old_rdate = c_r1.text_input("Bulunacak Kelime", "Revizyon Tarihi: -", key="or_p_rdate")
-                    new_rdate = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Revizyon Tarihi: 20.08.2025", key="nw_p_rdate")
+                # --- MENÜ 2: AKILLI SATIR DEĞİŞTİRİCİ (Yeni Değer Yeterli) ---
+                with st.expander("🧠 2. Akıllı Satır Değiştiriciler (Eski değere gerek YOK!)", expanded=True):
+                    st.caption("Sistem buradaki başlıkları otomatik bulur, karşısında ne yazarsa yazsın o satırı tamamen silip sizin yazdığınız yeni bilgiyi oraya ekler.")
 
-                    st.markdown("**13. Versiyon**")
-                    old_vers = c_r1.text_input("Bulunacak Kelime", "Versiyon: 00", key="or_p_vers")
-                    new_vers = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Versiyon: 01", key="nw_p_vers")
+                    st.markdown("**Tedarikçi Tel**")
+                    new_tel_sup = st.text_input("Yeni Tel", placeholder="Örn: Tel: 0 555 555 55 55", key="nw_p_tel_sup")
+                    if new_tel_sup: smart_replacements.append(("Tel:", new_tel_sup))
 
-                    # V 115.5 - SON SAYFA DETAYLARI EKLENDİ
-                    st.markdown("**14. Son Sayfa Acil Durum Tel**")
-                    old_last_tel = c_r1.text_input("Bulunacak Kelime", "ACİL DURUM TELEFON NUMARALARI: 0 850 522 71 04", key="or_p_ltel")
-                    new_last_tel = c_r2.text_input("Bununla Değiştir", placeholder="Örn: ACİL DURUM TELEFON NUMARALARI: YENİ NO", key="nw_p_ltel")
+                    st.markdown("**Tedarikçi Fax**")
+                    new_fax = st.text_input("Yeni Fax", placeholder="Örn: Fax: 0 212 123 45 67", key="nw_p_fax")
+                    if new_fax: smart_replacements.append(("Fax:", new_fax))
 
-                    st.markdown("**15. GBF Yetkili Kişi**")
-                    old_gbf = c_r1.text_input("Bulunacak Kelime", "GBF Yetkili Kişi: ŞEVVAL GÖKÇE DENKÇİ", key="or_p_gbf")
-                    new_gbf = c_r2.text_input("Bununla Değiştir", placeholder="Örn: GBF Yetkili Kişi: YENİ İSİM", key="nw_p_gbf")
+                    st.markdown("**Tedarikçi E-mail**")
+                    new_mail = st.text_input("Yeni E-mail", placeholder="Örn: E-mail: info@bayi.com", key="nw_p_mail")
+                    if new_mail: smart_replacements.append(("E-mail:", new_mail))
 
-                    st.markdown("**16. Sertifika Geçerlilik Süresi**")
-                    old_cert_date = c_r1.text_input("Bulunacak Kelime", "Sertifika Geçerlilik Süresi: 31.12.2023", key="or_p_cval")
-                    new_cert_date = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Sertifika Geçerlilik Süresi: 01.01.2028", key="nw_p_cval")
+                    st.markdown("**Tedarikçi Web**")
+                    new_web = st.text_input("Yeni Web Sitesi", placeholder="Örn: Web: www.bayi.com", key="nw_p_web")
+                    if new_web: smart_replacements.append(("Web:", new_web))
 
-                    st.markdown("**17. Sertifika No**")
-                    old_cert_no = c_r1.text_input("Bulunacak Kelime", "Sertifika No: GBF01.60.02", key="or_p_cno")
-                    new_cert_no = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Sertifika No: YENİ-NO", key="nw_p_cno")
-                    
-                    if new_prod: text_replacements.append((old_prod, new_prod))
-                    if new_chem: text_replacements.append((old_chem, new_chem))
-                    if new_sup: text_replacements.append((old_sup, new_sup))
-                    if new_add: text_replacements.append((old_add, new_add))
-                    if new_tel_sup: text_replacements.append((old_tel_sup, new_tel_sup))
-                    if new_fax: text_replacements.append((old_fax, new_fax))
-                    if new_mail: text_replacements.append((old_mail, new_mail))
-                    if new_web: text_replacements.append((old_web, new_web))
-                    if new_per: text_replacements.append((old_per, new_per))
-                    if new_tel: text_replacements.append((old_tel, new_tel))
-                    if new_cdate: text_replacements.append((old_cdate, new_cdate))
-                    if new_rdate: text_replacements.append((old_rdate, new_rdate))
-                    if new_vers: text_replacements.append((old_vers, new_vers))
-                    if new_last_tel: text_replacements.append((old_last_tel, new_last_tel))
-                    if new_gbf: text_replacements.append((old_gbf, new_gbf))
-                    if new_cert_date: text_replacements.append((old_cert_date, new_cert_date))
-                    if new_cert_no: text_replacements.append((old_cert_no, new_cert_no))
+                    st.markdown("**Oluşturma Tarihi**")
+                    new_cdate = st.text_input("Yeni Oluşturma Tarihi", placeholder="Örn: Oluşturma Tarihi: 15.06.2024", key="nw_p_cdate")
+                    if new_cdate: smart_replacements.append(("Oluşturma Tarihi:", new_cdate))
 
-            with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
+                    st.markdown("**Revizyon Tarihi**")
+                    new_rdate = st.text_input("Yeni Revizyon Tarihi", placeholder="Örn: Revizyon Tarihi: 20.08.2025", key="nw_p_rdate")
+                    if new_rdate: smart_replacements.append(("Revizyon Tarihi:", new_rdate))
+
+                    st.markdown("**Versiyon Numarası**")
+                    new_vers = st.text_input("Yeni Versiyon", placeholder="Örn: Versiyon: 01", key="nw_p_vers")
+                    if new_vers: smart_replacements.append(("Versiyon:", new_vers))
+
+                    st.markdown("**Acil Durum Tel (Son Sayfa veya Tablo)**")
+                    new_last_tel = st.text_input("Yeni Acil Tel", placeholder="Örn: ACİL DURUM TELEFON NUMARALARI: 112", key="nw_p_ltel")
+                    if new_last_tel: smart_replacements.append(("ACİL DURUM TELEFON", new_last_tel))
+
+                    st.markdown("**GBF Yetkili Kişi (Son Sayfa)**")
+                    new_gbf = st.text_input("Yeni GBF Yetkilisi", placeholder="Örn: GBF Yetkili Kişi: YENİ İSİM", key="nw_p_gbf")
+                    if new_gbf: smart_replacements.append(("GBF Yetkili Kişi:", new_gbf))
+
+                    st.markdown("**Sertifika Geçerlilik Süresi**")
+                    new_cert_date = st.text_input("Yeni Sertifika Tarihi", placeholder="Örn: Sertifika Geçerlilik Süresi: 01.01.2028", key="nw_p_cval")
+                    if new_cert_date: smart_replacements.append(("Sertifika Geçerlilik Süresi:", new_cert_date))
+
+                    st.markdown("**Sertifika No**")
+                    new_cert_no = st.text_input("Yeni Sertifika No", placeholder="Örn: Sertifika No: YENİ-NO", key="nw_p_cno")
+                    if new_cert_no: smart_replacements.append(("Sertifika No:", new_cert_no))
+
+            with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=False):
                 st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
                 
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
@@ -420,7 +408,8 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                             bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                             logo_x, logo_y, logo_w, addr_x, addr_y, 
                             st.session_state['lang'],
-                            text_replacements 
+                            exact_replacements,
+                            smart_replacements
                         )
                         if pdf_out:
                             st.success(f"İşlem Başarılı! {doc_type} bütün sayfalara uygulandı.")
@@ -440,7 +429,8 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                 bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                 logo_x, logo_y, logo_w, addr_x, addr_y,
-                text_replacements 
+                exact_replacements,
+                smart_replacements
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
