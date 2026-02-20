@@ -49,7 +49,7 @@ if not st.session_state['logged_in']:
                             "theme_bg": "#0E1117", "theme_txt": "#FAFAFA", "theme_btn": "#8998f3", 
                             "app_title": "BİMAKS APP", "app_footer": "Created by Ogün Gümüşay",
                             "enable_quote": True, "enable_social_media": True, "enable_linkedin": True, "enable_instagram": False, "enable_problem_solver": True,
-                            "enable_dealer_sds": False # <--- YENİ V 112.0
+                            "enable_dealer_sds": False 
                         }
                         st.success("Giriş Başarılı! Yönlendiriliyorsunuz...")
                         time.sleep(1)
@@ -129,7 +129,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     st.header(t('btn_bimaks_tech'))
     if not st.session_state['settings_db'].get("genai_key"): st.info(_("👋 API Anahtarı Gerekli. Lütfen Ayarlar'dan API girin.", "👋 API Key Required.", "👋 Требуется ключ API", "👋 مفتاح API مطلوب")); st.stop()
     
-    # --- YENİ V 112.0 NAVİGASYON MATRİSİ ---
     show_sds = st.session_state['settings_db'].get("enable_dealer_sds", False)
     nav_tabs = [t('nav_analysis'), t('nav_roi'), t('nav_ocr'), t('nav_reg')]
     if show_sds: nav_tabs.append("SDS/TDS")
@@ -261,10 +260,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 112.0)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 112.1)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
-        st.info(_("Orijinal PDF'in üst kısmındaki (antetteki) logoyu ve adresi beyaz bir bantla kapatıp, üzerine bayinin logosunu ve adresini yerleştirir. İşlem belgedeki bütün sayfalara uygulanır.", "Masks the top header of the original PDF and places the dealer's logo and address. Applied to all pages.", "Маскирует верхний колонтитул и размещает логотип дилера.", "يخفي الترويسة العلوية ويضع شعار الوكيل."))
+        st.info(_("Orijinal PDF'in üst kısmındaki logoyu ve adresi beyaz bir bantla kapatıp, üzerine bayinin logotipini yerleştirir. İşlem belgedeki bütün sayfalara uygulanır.", "Masks the top header of the original PDF and places the dealer's logo and address. Applied to all pages.", "Маскирует верхний колонтитул и размещает логотип дилера.", "يخفي الترويسة العلوية ويضع شعار الوكيل."))
         
         c_sds1, c_sds2 = st.columns(2)
         sds_file = c_sds1.file_uploader(_("1. Orijinal SDS/TDS (PDF)", "1. Original SDS/TDS (PDF)", "1. Оригинальный SDS/TDS", "1. SDS/TDS الأصلي"), type=['pdf'])
@@ -272,20 +271,30 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         d_addr = st.text_area(_("3. Bayi Adresi / İletişim Bilgileri", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
         
         st.markdown("---")
-        st.markdown(_("**⚙️ İnce Ayarlar (Beyaz Maske Konumu)**", "**⚙️ Fine-tuning (Masking Height)**", "**⚙️ Точная настройка**", "**⚙️ الضبط الدقيق**"))
-        mask_height = st.slider(_("Üst Kapanacak Alan Yüksekliği (Piksel - Büyüttükçe aşağı doğru daha fazla alanı kapatır)", "Top Mask Height", "Высота верхней маски", "ارتفاع القناع العلوي"), 50, 300, 110)
         
-        if st.button(_("PDF'i Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
-            if sds_file:
-                with st.spinner("PDF Maskeleniyor..."):
-                    pdf_out = logic.create_dealer_pdf(sds_file.getvalue(), d_logo.getvalue() if d_logo else None, d_addr, mask_height, st.session_state['lang'])
-                    if pdf_out:
-                        st.success("İşlem Başarılı! Aşağıdan indirebilirsiniz.")
-                        st.download_button("📥 İndir / Download", data=pdf_out, file_name="Bayi_SDS_TDS.pdf", mime="application/pdf")
-                    else:
-                        st.error("HATA: PDF işlenemedi. Lütfen belgeyi kontrol edin.")
-            else:
-                st.warning("Lütfen orijinal PDF dosyasını yükleyin.")
+        c_p1, c_p2 = st.columns([1, 1])
+        with c_p1:
+            st.markdown(_("**⚙️ İnce Ayarlar (Beyaz Maske Konumu)**", "**⚙️ Fine-tuning (Masking Height)**", "**⚙️ Точная настройка**", "**⚙️ الضبط الدقيق**"))
+            mask_height = st.slider(_("Üst Kapanacak Alan Yüksekliği (Piksel - Büyüttükçe aşağı doğru daha fazla alanı kapatır)", "Top Mask Height", "Высота верхней маски", "ارتفاع القناع العلوي"), 50, 300, 110)
+            
+            st.markdown("---")
+            if st.button(_("✅ Onayla ve PDF'i Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
+                if sds_file:
+                    with st.spinner("PDF Maskeleniyor ve Oluşturuluyor..."):
+                        pdf_out = logic.create_dealer_pdf(sds_file.getvalue(), d_logo.getvalue() if d_logo else None, d_addr, mask_height, st.session_state['lang'])
+                        if pdf_out:
+                            st.success("İşlem Başarılı! Aşağıdan indirebilirsiniz.")
+                            st.download_button("📥 İndir / Download", data=pdf_out, file_name="Bayi_SDS_TDS.pdf", mime="application/pdf")
+                        else:
+                            st.error("HATA: PDF işlenemedi. Orijinal belgede bir sorun olabilir.")
+                else:
+                    st.warning("Lütfen orijinal PDF dosyasını yükleyin.")
+                    
+        with c_p2:
+            st.markdown(_("**👀 Canlı Önizleme (Live Preview)**", "**👀 Live Preview**", "**👀 Предварительный просмотр**", "**👀 معاينة حية**"))
+            st.caption("Aşağıdaki sanal A4 kağıdında, üstteki kırmızı çerçevenin içindeki alan beyaz bir bantla kapatılacak ve bilgileriniz buraya yerleşecektir. Sürgüyü kaydırarak çerçevenin eski logonuzu tamamen kapattığından emin olun.")
+            preview_img = logic.generate_sds_preview(d_logo.getvalue() if d_logo else None, d_addr, mask_height)
+            st.image(preview_img, caption="Sanal A4 Önizlemesi", use_container_width=True)
 
 # 2. LINKEDIN
 elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_state.get('show_settings'):
@@ -476,7 +485,6 @@ elif st.session_state.get('show_settings'):
                 ins = st.checkbox(" > Instagram", st.session_state['settings_db'].get("enable_instagram"))
                 pe = st.checkbox(_("Problem Çözücü", "Problem Solver", "Решатель проблем", "حل المشكلات"), st.session_state['settings_db'].get("enable_problem_solver"))
                 
-                # --- YENİ V 112.0 ADMİN KİLİDİ ---
                 sds_cb = st.checkbox(" > Bayi SDS/TDS", st.session_state['settings_db'].get("enable_dealer_sds", False))
                 qe = st.checkbox(_("Teklif", "Quote", "Коммерческое предложение", "اقتباس"), st.session_state['settings_db'].get("enable_quote"))
                 
