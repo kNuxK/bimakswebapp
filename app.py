@@ -48,7 +48,8 @@ if not st.session_state['logged_in']:
                             "instagram_account_id": data.get('instagram_account_id', ''), 
                             "theme_bg": "#0E1117", "theme_txt": "#FAFAFA", "theme_btn": "#8998f3", 
                             "app_title": "BİMAKS APP", "app_footer": "Created by Ogün Gümüşay",
-                            "enable_quote": True, "enable_social_media": True, "enable_linkedin": True, "enable_instagram": False, "enable_problem_solver": True
+                            "enable_quote": True, "enable_social_media": True, "enable_linkedin": True, "enable_instagram": False, "enable_problem_solver": True,
+                            "enable_dealer_sds": False # <--- YENİ V 112.0
                         }
                         st.success("Giriş Başarılı! Yönlendiriliyorsunuz...")
                         time.sleep(1)
@@ -128,11 +129,19 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     st.header(t('btn_bimaks_tech'))
     if not st.session_state['settings_db'].get("genai_key"): st.info(_("👋 API Anahtarı Gerekli. Lütfen Ayarlar'dan API girin.", "👋 API Key Required.", "👋 Требуется ключ API", "👋 مفتاح API مطلوب")); st.stop()
     
-    nav_c1, nav_c2, nav_c3, nav_c4 = st.columns(4)
-    if nav_c1.button(t('nav_analysis'), use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'Analysis' else "secondary"): st.session_state['bimaks_sub_tab'] = 'Analysis'; st.rerun()
-    if nav_c2.button(t('nav_roi'), use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'ROI' else "secondary"): st.session_state['bimaks_sub_tab'] = 'ROI'; st.rerun()
-    if nav_c3.button(t('nav_ocr'), use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'OCR' else "secondary"): st.session_state['bimaks_sub_tab'] = 'OCR'; st.rerun()
-    if nav_c4.button(t('nav_reg'), use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'REG' else "secondary"): st.session_state['bimaks_sub_tab'] = 'REG'; st.rerun()
+    # --- YENİ V 112.0 NAVİGASYON MATRİSİ ---
+    show_sds = st.session_state['settings_db'].get("enable_dealer_sds", False)
+    nav_tabs = [t('nav_analysis'), t('nav_roi'), t('nav_ocr'), t('nav_reg')]
+    if show_sds: nav_tabs.append("SDS/TDS")
+    
+    nav_cols = st.columns(len(nav_tabs))
+    
+    if nav_cols[0].button(nav_tabs[0], use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'Analysis' else "secondary"): st.session_state['bimaks_sub_tab'] = 'Analysis'; st.rerun()
+    if nav_cols[1].button(nav_tabs[1], use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'ROI' else "secondary"): st.session_state['bimaks_sub_tab'] = 'ROI'; st.rerun()
+    if nav_cols[2].button(nav_tabs[2], use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'OCR' else "secondary"): st.session_state['bimaks_sub_tab'] = 'OCR'; st.rerun()
+    if nav_cols[3].button(nav_tabs[3], use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'REG' else "secondary"): st.session_state['bimaks_sub_tab'] = 'REG'; st.rerun()
+    if show_sds:
+        if nav_cols[4].button(nav_tabs[4], use_container_width=True, type="primary" if st.session_state['bimaks_sub_tab'] == 'SDS' else "secondary"): st.session_state['bimaks_sub_tab'] = 'SDS'; st.rerun()
     
     st.divider()
 
@@ -251,6 +260,32 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             reg_prompt = f"ACT AS: Regulatory Expert. QUESTION: {q_reg}. CRITICAL LANGUAGE RULE: YOU MUST WRITE YOUR ENTIRE RESPONSE STRICTLY IN {lang_name.upper()}."
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
+            
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 112.0)
+    elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
+        st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
+        st.info(_("Orijinal PDF'in üst kısmındaki (antetteki) logoyu ve adresi beyaz bir bantla kapatıp, üzerine bayinin logosunu ve adresini yerleştirir. İşlem belgedeki bütün sayfalara uygulanır.", "Masks the top header of the original PDF and places the dealer's logo and address. Applied to all pages.", "Маскирует верхний колонтитул и размещает логотип дилера.", "يخفي الترويسة العلوية ويضع شعار الوكيل."))
+        
+        c_sds1, c_sds2 = st.columns(2)
+        sds_file = c_sds1.file_uploader(_("1. Orijinal SDS/TDS (PDF)", "1. Original SDS/TDS (PDF)", "1. Оригинальный SDS/TDS", "1. SDS/TDS الأصلي"), type=['pdf'])
+        d_logo = c_sds2.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل"), type=['png', 'jpg', 'jpeg'])
+        d_addr = st.text_area(_("3. Bayi Adresi / İletişim Bilgileri", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
+        
+        st.markdown("---")
+        st.markdown(_("**⚙️ İnce Ayarlar (Beyaz Maske Konumu)**", "**⚙️ Fine-tuning (Masking Height)**", "**⚙️ Точная настройка**", "**⚙️ الضبط الدقيق**"))
+        mask_height = st.slider(_("Üst Kapanacak Alan Yüksekliği (Piksel - Büyüttükçe aşağı doğru daha fazla alanı kapatır)", "Top Mask Height", "Высота верхней маски", "ارتفاع القناع العلوي"), 50, 300, 110)
+        
+        if st.button(_("PDF'i Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
+            if sds_file:
+                with st.spinner("PDF Maskeleniyor..."):
+                    pdf_out = logic.create_dealer_pdf(sds_file.getvalue(), d_logo.getvalue() if d_logo else None, d_addr, mask_height, st.session_state['lang'])
+                    if pdf_out:
+                        st.success("İşlem Başarılı! Aşağıdan indirebilirsiniz.")
+                        st.download_button("📥 İndir / Download", data=pdf_out, file_name="Bayi_SDS_TDS.pdf", mime="application/pdf")
+                    else:
+                        st.error("HATA: PDF işlenemedi. Lütfen belgeyi kontrol edin.")
+            else:
+                st.warning("Lütfen orijinal PDF dosyasını yükleyin.")
 
 # 2. LINKEDIN
 elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_state.get('show_settings'):
@@ -440,13 +475,16 @@ elif st.session_state.get('show_settings'):
                 li = st.checkbox(" > LinkedIn", st.session_state['settings_db'].get("enable_linkedin"))
                 ins = st.checkbox(" > Instagram", st.session_state['settings_db'].get("enable_instagram"))
                 pe = st.checkbox(_("Problem Çözücü", "Problem Solver", "Решатель проблем", "حل المشكلات"), st.session_state['settings_db'].get("enable_problem_solver"))
+                
+                # --- YENİ V 112.0 ADMİN KİLİDİ ---
+                sds_cb = st.checkbox(" > Bayi SDS/TDS", st.session_state['settings_db'].get("enable_dealer_sds", False))
                 qe = st.checkbox(_("Teklif", "Quote", "Коммерческое предложение", "اقتباس"), st.session_state['settings_db'].get("enable_quote"))
                 
                 if st.button(_("Tema Kaydet", "Save Theme", "Сохранить тему", "حفظ السمة")): 
                     st.session_state['settings_db'].update({
                         "app_title": nt, "app_footer": nf, "enable_social_media": se, 
                         "enable_linkedin": li, "enable_instagram": ins, "enable_problem_solver": pe, 
-                        "enable_quote": qe, "theme_bg": nbg, "theme_txt": ntxt, "theme_btn": nbtn
+                        "enable_dealer_sds": sds_cb, "enable_quote": qe, "theme_bg": nbg, "theme_txt": ntxt, "theme_btn": nbtn
                     })
                     st.success("Tema güncellendi!"); time.sleep(1); st.rerun()
                 
@@ -525,7 +563,6 @@ elif st.session_state.get('active_tab') == t('btn_quote') and not st.session_sta
         st.session_state['quote_items'].append(new_item)
         st.rerun()
     
-    # YENİ V 111.0: EKLENEN ÜRÜNLERİ SİLMEDEN DÜZENLEME MOTORU EKLENDİ
     if st.session_state['quote_items']:
         st.markdown("---")
         st.markdown(_("**📝 Eklenen Ürünler (Düzenleyebilirsiniz)**", "**📝 Added Items (Editable)**", "**📝 Добавленные товары (можно редактировать)**", "**📝 العناصر المضافة (قابلة للتعديل)**"))
