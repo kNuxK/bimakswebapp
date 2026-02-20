@@ -260,7 +260,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.2)
+    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 115.3)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
@@ -304,13 +304,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     old_fax = c_r1.text_input("Bulunacak Kelime", "Fax: 0216 321 32 13", key="or_p_fax")
                     new_fax = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Fax", key="nw_p_fax")
 
+                    # V 115.3 - LİNK FORMATINDAN KAÇMAK İÇİN SADECE MAİL VE WEB KISMI ARATILDI
                     st.markdown("**7. Tedarikçi E-mail**")
-                    old_mail = c_r1.text_input("Bulunacak Kelime", "E-mail: info@bimakskimya.com", key="or_p_mail")
-                    new_mail = c_r2.text_input("Bununla Değiştir", placeholder="Yeni E-mail", key="nw_p_mail")
+                    old_mail = c_r1.text_input("Bulunacak Kelime", "info@bimakskimya.com", key="or_p_mail")
+                    new_mail = c_r2.text_input("Bununla Değiştir", placeholder="Örn: info@bayi.com", key="nw_p_mail")
 
                     st.markdown("**8. Tedarikçi Web**")
-                    old_web = c_r1.text_input("Bulunacak Kelime", "Web: www.bimakskimya.com", key="or_p_web")
-                    new_web = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Web", key="nw_p_web")
+                    old_web = c_r1.text_input("Bulunacak Kelime", "www.bimakskimya.com", key="or_p_web")
+                    new_web = c_r2.text_input("Bununla Değiştir", placeholder="Örn: www.bayi.com", key="nw_p_web")
 
                     st.markdown("**9. Başvurulacak Kişi**")
                     old_per = c_r1.text_input("Bulunacak Kelime", "AYŞE ARPACI, ROY KARASU", key="or_p4")
@@ -320,7 +321,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     old_tel = c_r1.text_input("Bulunacak Kelime", "BİMAKS KİMYA: 0 850 522 71 04", key="or_p5")
                     new_tel = c_r2.text_input("Bununla Değiştir", placeholder="Yeni Acil Durum Numarası", key="nw_p5")
 
-                    # V 115.2 - YENİ EKLENEN 3 ALAN (Tarihler ve Versiyon)
                     st.markdown("**11. Oluşturma Tarihi**")
                     old_cdate = c_r1.text_input("Bulunacak Kelime", "Oluşturma Tarihi: 24.02.2020", key="or_p_cdate")
                     new_cdate = c_r2.text_input("Bununla Değiştir", placeholder="Örn: Oluşturma Tarihi: 15.06.2024", key="nw_p_cdate")
@@ -350,6 +350,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=True):
                 st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
                 
+                # V 115.3 - YENİ VARSAYILAN (DEFAULT) KOORDİNATLAR
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
                 ct1, ct2, ct3, ct4 = st.columns(4)
                 top_mask_x = ct1.slider("X (Sağ-Sol)", 0, 595, 357, key=f"{doc_type}_tm_x")
