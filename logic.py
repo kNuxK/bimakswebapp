@@ -45,7 +45,7 @@ except ImportError:
     HAS_PYMUPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 120.0 - KOTA & CACHE KORUMASI)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA
 # ==============================================================================
 
 def get_gsheets_client():
@@ -71,7 +71,6 @@ def get_db_sheet():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# V 120.0: Veri kaybını önlemek için Cache (Ön Bellek) Mekanizması eklendi
 def get_role_definitions():
     defs = {"Admin": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
             "Bimaks Üye": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
@@ -93,7 +92,6 @@ def get_role_definitions():
     return st.session_state.get('cached_roles', defs)
 
 def update_role_definitions(admin_p, bimaks_p, yeni_p):
-    # Arayüzün beklememesi ve hata anında sıfırlanmaması için önce Cache güncellenir
     st.session_state['cached_roles'] = {"Admin": admin_p, "Bimaks Üye": bimaks_p, "Yeni Üye": yeni_p}
     
     sheet = get_db_sheet()
@@ -203,7 +201,6 @@ def update_user_keys(username, genai, li, insta, insta_id):
         st.error(f"Güncelleme Hatası: {e}")
         return False
 
-# V 120.0: Veri kaybını önlemek için Cache Mekanizması eklendi
 def get_all_users_status():
     try:
         sheet = get_db_sheet()
@@ -228,11 +225,9 @@ def get_all_users_status():
         st.session_state['cached_users'] = users
         return users
     except Exception as e:
-        # API Kota Hatası verirse ekranı boşaltma, eski listeyi göster
         return st.session_state.get('cached_users', [])
 
 def update_user_role(username, new_role):
-    # Arayüzün beklememesi ve hata anında sıfırlanmaması için önce Cache güncellenir
     if 'cached_users' in st.session_state:
         for u in st.session_state['cached_users']:
             if u['username'] == username:
@@ -570,7 +565,8 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
     
     y = start_y - 120; c.line(40, y+15, 560, y+15); c.setFont(f_reg, 9)
     
-    amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة"}.get(lang_code, "Ambalaj")
+    # V 121.0: 6 DİL İÇİN AMBALAJ ÇEVİRİSİ
+    amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة", "FR":"Emballage", "ES":"Paquete"}.get(lang_code, "Ambalaj")
     
     c.drawString(40, y, t('q_prod_name')); c.drawString(220, y, amb_text); c.drawString(450, y, f"{t('q_price')} ({currency})")
     
