@@ -134,7 +134,6 @@ with st.sidebar:
             st.session_state['show_settings'] = False
             st.rerun()
 
-    # V 121.0: 6 DİL İÇİN SIDEBAR MENÜSÜ
     st.markdown("---"); st.markdown("### 🌐 Language")
     r1c1, r1c2, r1c3 = st.columns(3)
     if r1c1.button("TR", use_container_width=True): st.session_state['lang'] = 'TR'; st.rerun()
@@ -374,7 +373,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
     # F. BAYİ SDS/TDS ÜRETİCİ
-    elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
+    elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
         st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية.", "Un aperçu en direct du PDF s'affichera à droite.", "Se mostrará una vista previa en vivo del PDF a la derecha."))
