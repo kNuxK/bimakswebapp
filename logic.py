@@ -45,7 +45,7 @@ except ImportError:
     HAS_PYMUPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 118.1 KOTA KORUMASI EKLENDİ)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 119.0)
 # ==============================================================================
 
 def get_gsheets_client():
@@ -57,11 +57,9 @@ def get_gsheets_client():
         client = gspread.authorize(creds)
         return client
     except Exception as e:
-        # Sessizce devam et, hata patlatma
         return None
 
 def get_db_sheet():
-    # V 118.1: API koptuğunda veya limit dolduğunda uygulamanın çökmesini engelleyen kalkan
     try:
         client = get_gsheets_client()
         if not client: return None
@@ -73,25 +71,38 @@ def get_db_sheet():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-def ping_online(username):
-    # V 118.1: Kullanıcının her tıklamasında API'yi boğmamak için 60 saniye bekleme süresi eklendi
+# V 119.0: Rollerin global yetkilerini tutan gizli satırı okur
+def get_role_definitions():
+    sheet = get_db_sheet()
+    defs = {"Admin": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
+            "Bimaks Üye": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
+            "Yeni Üye": ""}
+    if not sheet: return defs
     try:
-        now = time.time()
-        last_ping = st.session_state.get('last_ping_time', 0)
-        if now - last_ping < 60: 
-            return # 60 saniye geçmediyse Google'a istek atma, API'yi yorma
-            
-        sheet = get_db_sheet()
-        if not sheet: return
-        
+        rows = sheet.get_all_values()
+        for r in rows:
+            if len(r) > 0 and r[0] == '__ROLE_DEFS__':
+                defs["Admin"] = r[1] if len(r)>1 else ""
+                defs["Bimaks Üye"] = r[2] if len(r)>2 else ""
+                defs["Yeni Üye"] = r[3] if len(r)>3 else ""
+                return defs
+    except: pass
+    return defs
+
+def update_role_definitions(admin_p, bimaks_p, yeni_p):
+    sheet = get_db_sheet()
+    if not sheet: return False
+    try:
         users = sheet.col_values(1)
-        if username in users:
-            row_idx = users.index(username) + 1
-            now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-            sheet.update_cell(row_idx, 8, now_str)
-            st.session_state['last_ping_time'] = now
-    except: 
-        pass 
+        if '__ROLE_DEFS__' in users:
+            row_idx = users.index('__ROLE_DEFS__') + 1
+            sheet.update_cell(row_idx, 2, admin_p)
+            sheet.update_cell(row_idx, 3, bimaks_p)
+            sheet.update_cell(row_idx, 4, yeni_p)
+        else:
+            sheet.append_row(['__ROLE_DEFS__', admin_p, bimaks_p, yeni_p])
+        return True
+    except: return False
 
 def login_user(username, password):
     sheet = get_db_sheet()
@@ -99,20 +110,26 @@ def login_user(username, password):
     try:
         rows = sheet.get_all_values()
         hashed_pw = hash_password(password)
+        role_defs = None 
+        
         for i, r in enumerate(rows):
-            if i == 0: continue 
+            if i == 0 or (len(r)>0 and r[0] == '__ROLE_DEFS__'): continue 
             r_user = r[0] if len(r) > 0 else ""
             r_pass = r[1] if len(r) > 1 else ""
+            
             if str(r_user) == username and str(r_pass) == hashed_pw:
                 r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin" 
-                r_perms = r[8] if len(r) > 8 else ""
                 
-                if r_role.lower() == "admin" and not r_perms:
-                    r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
-                
+                # Sadece giriş yapıldığı an saati günceller (Kotayı korur)
                 now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
                 try: sheet.update_cell(i + 1, 8, now_str)
                 except: pass 
+                
+                if not role_defs: role_defs = get_role_definitions()
+                
+                r_perms = role_defs.get(r_role, "")
+                if r_role.lower() == "admin" and not r_perms:
+                    r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
                 
                 data = {
                     "username": r_user,
@@ -128,7 +145,7 @@ def login_user(username, password):
     except Exception as e:
         return False, f"Okuma hatası: {e}"
 
-def register_user(username, password, role="Yeni Üye", perms=""):
+def register_user(username, password, role="Yeni Üye"):
     sheet = get_db_sheet()
     if not sheet: return False, "Veritabanı bağlantı hatası."
     try:
@@ -139,7 +156,7 @@ def register_user(username, password, role="Yeni Üye", perms=""):
         
         hashed_pw = hash_password(password)
         now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-        new_row = [username, hashed_pw, "", "", "", "", role, now_str, perms]
+        new_row = [username, hashed_pw, "", "", "", "", role, now_str]
         sheet.append_row(new_row)
         return True, "Kayıt başarılı!"
     except Exception as e:
@@ -169,35 +186,22 @@ def get_all_users_status():
         rows = sheet.get_all_values()
         if len(rows) <= 1: return []
         users = []
-        now = datetime.now()
         for r in rows[1:]:
             u_name = r[0] if len(r) > 0 else ""
-            if not u_name: continue
+            if not u_name or u_name == '__ROLE_DEFS__': continue
             u_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin"
-            u_last = r[7] if len(r) > 7 else ""
-            u_perms = r[8] if len(r) > 8 else ""
-            
-            status = "🔴 Offline"
-            if u_last:
-                try:
-                    last_time = datetime.strptime(u_last, "%d.%m.%Y %H:%M:%S")
-                    diff = now - last_time
-                    if diff.total_seconds() <= 900: 
-                        status = "🟢 Online"
-                except: pass
+            u_last = r[7] if len(r) > 7 else "Hiç girmedi"
             
             users.append({
                 "username": u_name,
                 "role": u_role,
-                "status": status,
-                "last_seen": u_last if u_last else "Hiç girmedi",
-                "permissions": u_perms
+                "last_seen": u_last
             })
         return users
     except Exception as e:
         return []
 
-def update_user_role_and_perms(username, new_role, new_perms):
+def update_user_role(username, new_role):
     sheet = get_db_sheet()
     if not sheet: return False
     try:
@@ -205,7 +209,6 @@ def update_user_role_and_perms(username, new_role, new_perms):
         if username in users:
             row_idx = users.index(username) + 1
             sheet.update_cell(row_idx, 7, new_role)
-            sheet.update_cell(row_idx, 9, new_perms)
             return True
         return False
     except:
