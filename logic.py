@@ -310,10 +310,16 @@ def force_clean_text(text):
     text = re.sub(r'^(Merhaba|Ben|Sen|Biz|Bir yapay zeka|Yapay zeka|İşte makaleniz|Hazırladığım|Here is|Sure|As requested|Here\'s|I have written).*?[\.\!\?]\s*', '', text, flags=re.IGNORECASE)
     return text.strip()
 
+def smart_trim(text, limit):
+    return text
+
+# --- GEMINI API ---
 def get_gemini_response_from_manual(full_prompt, api_key):
     if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
+    
     models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro']
     genai.configure(api_key=api_key)
+    
     last_err = ""
     for model_name in models_to_try:
         try:
@@ -325,8 +331,10 @@ def get_gemini_response_from_manual(full_prompt, api_key):
             last_err = str(e)
             time.sleep(0.5) 
             continue
+            
     return f"❌ HATA / ERROR: {last_err}"
 
+# --- GERÇEK LINKEDIN API ENTEGRASYONU ---
 def get_linkedin_user_urn(access_token):
     access_token = str(access_token).strip()
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -363,11 +371,14 @@ def register_upload_image(access_token, person_urn):
 
 def post_to_linkedin_real(text, media_bytes, media_type, access_token):
     if not access_token: return "❌ HATA: LinkedIn Token girilmemiş."
+    
     access_token = str(access_token).strip()
     person_id = get_linkedin_user_urn(access_token)
     if not person_id: return "❌ HATA: Token geçersiz veya erişim izni yok."
     person_urn = f"urn:li:person:{person_id}"
+    
     asset_urn = None
+    
     if media_bytes and "image" in media_type:
         upload_url, asset = register_upload_image(access_token, person_id)
         if upload_url:
@@ -378,23 +389,43 @@ def post_to_linkedin_real(text, media_bytes, media_type, access_token):
                 else: return f"❌ HATA: Resim yüklenemedi. Kod: {put_resp.status_code}"
             except Exception as e: return f"❌ HATA: Resim upload sorunu: {str(e)}"
         else: return "❌ HATA: Resim kaydı başarısız."
+
     post_url = "https://api.linkedin.com/v2/ugcPosts"
     headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0'}
-    share_content = {"shareCommentary": {"text": text}, "shareMediaCategory": "NONE"}
+    
+    share_content = {
+        "shareCommentary": {"text": text},
+        "shareMediaCategory": "NONE"
+    }
+    
     if asset_urn:
         share_content["shareMediaCategory"] = "IMAGE"
-        share_content["media"] = [{"status": "READY", "description": {"text": "Bimaks App Auto Post"}, "media": asset_urn, "title": {"text": "Bimaks Visual"}}]
+        share_content["media"] = [{
+            "status": "READY",
+            "description": {"text": "Bimaks App Auto Post"},
+            "media": asset_urn,
+            "title": {"text": "Bimaks Visual"}
+        }]
+        
     payload = {
-        "author": person_urn, "lifecycleState": "PUBLISHED",
-        "specificContent": {"com.linkedin.ugc.ShareContent": share_content},
+        "author": person_urn,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": share_content
+        },
         "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
     }
+    
     try:
         response = requests.post(post_url, headers=headers, json=payload)
-        if response.status_code in [200, 201]: return "✅ BAŞARILI: Paylaşım LinkedIn'de yayında!"
-        else: return f"❌ HATA: LinkedIn reddetti. Kod: {response.status_code} - Mesaj: {response.text}"
-    except Exception as e: return f"❌ HATA: Bağlantı sorunu: {str(e)}"
+        if response.status_code in [200, 201]:
+            return "✅ BAŞARILI: Paylaşım LinkedIn'de yayında!"
+        else:
+            return f"❌ HATA: LinkedIn reddetti. Kod: {response.status_code} - Mesaj: {response.text}"
+    except Exception as e:
+        return f"❌ HATA: Bağlantı sorunu: {str(e)}"
 
+# --- GELİŞMİŞ ROI HESAPLAMA ---
 def calculate_advanced_roi(blowdown_curr, hours, coc_curr, coc_target, water_cost, energy_bill_total, scale_mm, chem_cost):
     try:
         coc_curr = float(coc_curr)
@@ -406,12 +437,16 @@ def calculate_advanced_roi(blowdown_curr, hours, coc_curr, coc_target, water_cos
         scale_loss_ratio = min(float(scale_mm) * 0.10, 0.50) 
         energy_saved = float(energy_bill_total) * scale_loss_ratio
         return {
-            "w_curr": float(blowdown_curr) * float(hours), "w_new": blowdown_new * float(hours),
-            "w_save": water_saved_total, "w_money": water_saved_total * float(water_cost),
-            "e_save": energy_saved, "total_gain": (water_saved_total * float(water_cost)) + energy_saved - float(chem_cost)
+            "w_curr": float(blowdown_curr) * float(hours),
+            "w_new": blowdown_new * float(hours),
+            "w_save": water_saved_total,
+            "w_money": water_saved_total * float(water_cost),
+            "e_save": energy_saved,
+            "total_gain": (water_saved_total * float(water_cost)) + energy_saved - float(chem_cost)
         }
     except: return None
 
+# --- OCR VE GÖRSEL ANALİZ ---
 def analyze_image_with_gemini(image_bytes, prompt_text, api_key):
     if not api_key: return "❌ API Key Missing."
     models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
@@ -425,6 +460,7 @@ def analyze_image_with_gemini(image_bytes, prompt_text, api_key):
         except: continue
     return "❌ OCR Error."
 
+# --- LSI HESAPLAMA ---
 def calculate_lsi(ph, tds, temp_c, ca_hard, alk):
     try:
         ph, tds, temp_c, ca_hard, alk = float(ph), float(tds), float(temp_c), float(ca_hard), float(alk)
@@ -436,24 +472,42 @@ def calculate_lsi(ph, tds, temp_c, ca_hard, alk):
         return ph - pHs, 2 * pHs - ph
     except: return None, None
 
+# --- PROMPT MİMARİSİ ---
 def construct_prompt_text(role, topic, audience, platform, product, limit, lang_code, product_link=None):
     lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
     lang_name = lang_dict['name']
     detail_lbl = lang_dict.get('detail_info', 'Detaylı Bilgi:')
+    
     safe_word_limit = int((limit * 0.90) / 6.5)
-    product_instruction = f"- 🧪 PRODUCT INTEGRATION: In your solution section, briefly explain why '{product}' should be used and how it technically solves the discussed problem." if product and str(product).strip() and str(product).strip() != "..." else "- 🧪 NO PRODUCT: Focus entirely on the technical methodology. Do not mention or promote any commercial products."
-    link_instruction = f"- 🔗 CONCLUSION: End the article with a strong technical summary, then on the absolute final line add exactly this text (DO NOT translate this line):\n{detail_lbl} {product_link}" if product_link and str(product_link).strip() else "- 🚀 CONCLUSION: End the article with a strong technical summary. Stop writing immediately after the summary."
+
+    product_instruction = ""
+    link_instruction = ""
+
+    if product and str(product).strip() and str(product).strip() != "...":
+        product_instruction = f"- 🧪 PRODUCT INTEGRATION: In your solution section, briefly explain why '{product}' should be used and how it technically solves the discussed problem."
+    else:
+        product_instruction = "- 🧪 NO PRODUCT: Focus entirely on the technical methodology. Do not mention or promote any commercial products."
+
+    if product_link and str(product_link).strip():
+        link_instruction = f"- 🔗 CONCLUSION: End the article with a strong technical summary, then on the absolute final line add exactly this text (DO NOT translate this line):\n{detail_lbl} {product_link}"
+    else:
+        link_instruction = "- 🚀 CONCLUSION: End the article with a strong technical summary. Stop writing immediately after the summary."
 
     prompt = f"""
     [CRITICAL SYSTEM COMMAND: YOUR ENTIRE OUTPUT MUST BE EXCLUSIVELY WRITTEN IN {lang_name.upper()}!]
+
     ACT AS: A World-Class '{role}' and industry thought leader with 20+ years of hands-on engineering, operational, and technical experience.
+    
     MISSION: Write a highly authoritative, deeply technical, and viral professional article.
     TOPIC TO WRITE ABOUT: '{topic}' (IGNORE the language of this topic. You MUST write the article in {lang_name.upper()}).
+    
     TARGET AUDIENCE: {audience}. Assume the audience consists of plant managers, technical directors, engineers, and industry professionals. Do NOT speak to them like beginners.
     PLATFORM: {platform}.
+    
     CRITICAL LANGUAGE RULE (MUTLAK İTAAT): 
     The requested topic or product name might be given to you in Turkish, English, or another language. YOU MUST COMPLETELY IGNORE THE INPUT LANGUAGE. 
     You MUST output your ENTIRE final response strictly, fluently, and natively in {lang_name.upper()}. Do not mix languages. TRANSLATE all your thoughts into {lang_name.upper()} before generating the text.
+    
     STRICT CONSTRAINTS & TONE:
     1. AVOID FLUFF: Absolutely NO generic motivational phrases, superficial business jargon, or cliché introductions. Get straight to the technical reality, root causes, and scientific/engineering facts.
     2. SAFE LENGTH LIMIT: You are strictly limited to a MAXIMUM of {safe_word_limit} words. Your entire response must easily fit within {limit} characters. Do NOT write long essays. Keep it extremely concise, punchy, and highly informative.
@@ -491,8 +545,10 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
     
     is_pdf_template = False
     template_bytes = st.session_state.get('template_data')
+    
     if template_bytes:
-        if isinstance(template_bytes, bytes) and b'%PDF' in template_bytes[:50]: is_pdf_template = True
+        if isinstance(template_bytes, bytes) and b'%PDF' in template_bytes[:50]:
+            is_pdf_template = True
         else:
             try: c.drawImage(ImageReader(io.BytesIO(template_bytes)), 0, 0, width=width, height=height)
             except: pass
@@ -508,35 +564,68 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
     c.drawString(350, start_y - 35, f"{t('q_payment')} {payment}")
     
     y = start_y - 120; c.line(40, y+15, 560, y+15); c.setFont(f_reg, 9)
+    
     amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة", "FR":"Emballage", "ES":"Paquete"}.get(lang_code, "Ambalaj")
+    
     c.drawString(40, y, t('q_prod_name')); c.drawString(220, y, amb_text); c.drawString(450, y, f"{t('q_price')} ({currency})")
     
     y -= 20; grand_total = 0
     for it in items:
         try:
-            p = float(it.get('price', 0)); q = float(it.get('qty', 1)); line_total = p * q; grand_total += line_total
-            name_text = str(it.get('name', '')); wrapped_name = textwrap.wrap(name_text, width=35) 
+            p = float(it.get('price', 0))
+            q = float(it.get('qty', 1))
+            line_total = p * q
+            grand_total += line_total
+            
+            name_text = str(it.get('name', ''))
+            wrapped_name = textwrap.wrap(name_text, width=35) 
             if not wrapped_name: wrapped_name = [""]
-            c.drawString(40, y, wrapped_name[0]); c.drawString(220, y, str(it.get('pkg', ''))[:15]); c.drawString(450, y, f"{p:,.2f}"); y -= 15
+            
+            c.drawString(40, y, wrapped_name[0])
+            c.drawString(220, y, str(it.get('pkg', ''))[:15])
+            c.drawString(450, y, f"{p:,.2f}")
+            y -= 15
+            
             if len(wrapped_name) > 1:
-                for extra_line in wrapped_name[1:]: c.drawString(40, y, extra_line); y -= 15
+                for extra_line in wrapped_name[1:]:
+                    c.drawString(40, y, extra_line)
+                    y -= 15
+                    
             y -= 5 
         except: continue
     
     if show_total: 
-        c.setFont(f_reg, 11); c.line(40, y, 560, y); c.drawString(350, y-20, f"{t('q_total')}: {grand_total:,.2f} {currency}")
+        c.setFont(f_reg, 11); c.line(40, y, 560, y)
+        c.drawString(350, y-20, f"{t('q_total')}: {grand_total:,.2f} {currency}")
     
-    bank_y = 100; c.setFont(f_reg, 9); c.drawString(50, bank_y, t('q_bank_lbl')); c.drawString(140, bank_y, bank_info.replace('\n', ' | '))
+    bank_y = 100; c.setFont(f_reg, 9); c.drawString(50, bank_y, t('q_bank_lbl'))
+    c.drawString(140, bank_y, bank_info.replace('\n', ' | '))
+    
     c.save(); buffer.seek(0)
     
     if is_pdf_template and HAS_PYPDF:
         try:
-            text_pdf = PdfReader(buffer); template_pdf = PdfReader(io.BytesIO(template_bytes)); writer = PdfWriter()
-            template_page = template_pdf.pages[0]; text_page = text_pdf.pages[0]
-            if hasattr(template_page, "merge_page"): template_page.merge_page(text_page)
-            elif hasattr(template_page, "mergePage"): template_page.mergePage(text_page)
-            writer.add_page(template_page); merged_buffer = io.BytesIO(); writer.write(merged_buffer); merged_buffer.seek(0); return merged_buffer
-        except Exception as e: return buffer
+            text_pdf = PdfReader(buffer)
+            template_pdf = PdfReader(io.BytesIO(template_bytes))
+            writer = PdfWriter()
+            
+            template_page = template_pdf.pages[0]
+            text_page = text_pdf.pages[0]
+            
+            if hasattr(template_page, "merge_page"):
+                template_page.merge_page(text_page)
+            elif hasattr(template_page, "mergePage"):
+                template_page.mergePage(text_page)
+                
+            writer.add_page(template_page)
+            
+            merged_buffer = io.BytesIO()
+            writer.write(merged_buffer)
+            merged_buffer.seek(0)
+            return merged_buffer
+        except Exception as e:
+            return buffer
+            
     return buffer
 
 def resize_for_instagram(image):
@@ -548,14 +637,13 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 123.1 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE DİKEY KALKAN) MOTORU
+# 🧠 V 123.2 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE DİKEY KALKAN) MOTORU
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes or not auto_data: return pdf_bytes
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME (Ana Başlığı değiştirmek için)
         old_prod = ""
         try:
             insts = doc[0].search_for("ÜRÜN ADI")
@@ -568,15 +656,13 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
         except: pass
 
         for page in doc:
-            # 2. LİNK KATİLİ (Tıklanabilir mavi E-Mail ve Web Bağlantılarını Temizle)
             try:
                 for link in page.get_links(): 
                     page.delete_link(link)
             except: pass
             
-            # 3. SAYFA 0 (İLK SAYFA) İÇİN ÖZEL GLOBAL DEĞİŞTİRİCİLER (Sadece ilk sayfayı etkiler)
+            # V 123.2: SADECE SAYFA 0 (İLK SAYFA) İÇİN ÖZEL GLOBAL DEĞİŞTİRİCİLER
             if page.number == 0:
-                # ÜRÜN ADI ANA BAŞLIK
                 if old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                     new_prod = str(auto_data["ÜRÜN ADI"][1])
                     o_insts = page.search_for(old_prod)
@@ -585,12 +671,10 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                         page.add_redact_annot(rect, fill=(1,1,1))
                         page.apply_redactions()
                         
-                        # V 123.1: Fontu biraz küçültüp Y eksenini %30 yukarı çekiyoruz
                         fsz = (inst.y1 - inst.y0) * 0.75
                         if fsz < 6: fsz = 9
-                        page.insert_text((inst.x0, inst.y1 - (inst.y1 - inst.y0)*0.30), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
+                        page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-                # TAM EŞLEŞMELİ MANUEL GİRDİLER (Eski Ürün Adı veya Adres)
                 if exact_replacements:
                     for old_text, new_text in exact_replacements:
                         if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
@@ -602,71 +686,84 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                 
                                 fsz = (inst.y1 - inst.y0) * 0.75
                                 if fsz < 6: fsz = 9
-                                page.insert_text((inst.x0, inst.y1 - (inst.y1 - inst.y0)*0.30), str(new_text), fontsize=fsz, color=(0,0,0), fontname="helv")
+                                page.insert_text((inst.x0, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname="helv")
                 
-                # ADRES BLOK OTOMASYONU (Tedarikçi ve Tel arasındaki alanı siler)
+                # ADRES BLOK OTOMASYONU
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
                     inst_ted = page.search_for("TEDARİKÇİ")
-                    inst_tel = page.search_for("Tel")
+                    
+                    # Tel: bulucu (Sadece kesin olarak iki nokta ile olanı alır ki dev boşluk silmesin)
+                    inst_tel = page.search_for("Tel:")
+                    if not inst_tel: inst_tel = page.search_for("Tel :")
+                    if not inst_tel: inst_tel = page.search_for("Tel")
+                    
                     if inst_ted and inst_tel:
-                        if inst_tel[0].y0 > inst_ted[0].y1:
-                            words_pg0 = page.get_text("words")
-                            t_words = [w for w in words_pg0 if w[1] < inst_ted[0].y1+3 and w[3] > inst_ted[0].y0-3 and w[0] >= inst_ted[0].x1-2]
-                            addr_x = min(w[0] for w in t_words) if t_words else inst_ted[0].x1 + 10
+                        ted = inst_ted[0]
+                        valid_tels = [t for t in inst_tel if t.y0 > ted.y1]
+                        if valid_tels:
+                            valid_tels.sort(key=lambda t: t.y0)
+                            tel = valid_tels[0]
                             
-                            addr_y0 = inst_ted[0].y1 + 2
-                            addr_y1 = inst_tel[0].y0 - 2
-                            
-                            if addr_y1 > addr_y0:
-                                rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
-                                page.add_redact_annot(rect, fill=(1,1,1))
-                                page.apply_redactions()
+                            # V 123.2: Mesafe kontrolü, eğer çok uzunsa (150px den fazlaysa) iptal et ki PDF silinmesin.
+                            if (tel.y0 - ted.y1) < 150: 
+                                words_pg0 = page.get_text("words")
+                                t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
+                                addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
                                 
-                                y_cursor = addr_y0 + 10
-                                for line in new_add.split('\n'):
-                                    page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
-                                    y_cursor += 12
+                                addr_y0 = ted.y1 + 2
+                                addr_y1 = tel.y0 - 2
+                                
+                                if addr_y1 > addr_y0:
+                                    rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
+                                    page.add_redact_annot(rect, fill=(1,1,1))
+                                    page.apply_redactions()
+                                    
+                                    y_cursor = addr_y0 + 10
+                                    for line in new_add.split('\n'):
+                                        page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
+                                        y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI (Tüm Sayfalar için Sağ Tarafı Silme ve Jilet Hizalama)
+            # 4. AKILLI BAŞLIK YAKALAYICI (Tüm Sayfalar için Jilet Hizalama)
             words = page.get_text("words")
             for key, (separator, new_val) in auto_data.items():
-                if not new_val or key == "ADDRESS": continue 
+                if not new_val or key == "ADDRESS" or key == "ÜRÜN ADI": continue 
                 
                 insts = page.search_for(key)
                 for inst in insts:
-                    # Sadece o başlığın SAĞINDAKİ kelimeleri yakala
                     tw = [w for w in words if w[1] < inst.y1+3 and w[3] > inst.y0-3 and w[0] >= inst.x1-2]
                     if tw:
                         min_x = min(w[0] for w in tw)
                         max_x = max(w[2] for w in tw)
                         
-                        # V 123.1: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ
+                        # V 123.2: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ
                         start_x = min_x
-                        if key in ["ÜRÜN ADI", "KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
-                            start_x = inst.x0 + 120 # Sol blok için sabit hiza
+                        if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
+                            start_x = inst.x0 + 155 # Sol blok için sabit hiza
+                        elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
+                            start_x = inst.x0 + 35  # Alt sol kolon hiza
                         elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
                             start_x = inst.x0 + 95  # Sağ blok için sabit hiza
+                        else:
+                            start_x = inst.x1 + 8 # Diğerleri için kelimeden hemen sonra başla
                         
-                        # Başlıktaki olası iki noktayı (:) silmemek için güvenlik sınırı
-                        safe_left_bound = inst.x1 + 6
+                        safe_left_bound = inst.x1 + 2
                         start_x = max(start_x, safe_left_bound)
                         
-                        # Silinecek alanı hesapla (Sadece sağ taraf, yükseklik olarak kilitli)
-                        wipe_x = min(min_x - 1, start_x - 1)
+                        wipe_x = min(min_x, start_x) - 2
                         wipe_x = max(wipe_x, safe_left_bound)
                         
-                        # V 123.1: Yüksekliği kelime boyutu kadar sabitliyoruz ki alttaki çizgileri yutmasın
-                        rect = fitz.Rect(wipe_x, inst.y0 - 1, max_x + 5, inst.y1 + 1)
+                        # V 123.2: Yüksekliği kelime boyutu kadar sabitliyoruz ki alttaki çizgileri/gri barları yutmasın
+                        rect = fitz.Rect(wipe_x, inst.y0, max_x + 5, inst.y1)
                         page.add_redact_annot(rect, fill=(1,1,1))
                         page.apply_redactions()
                         
-                        # V 123.1: Fontu %75 küçült, Y ekseninde %30 daha yukarı yaz (Alt çizgiye taşmayı engeller)
+                        # V 123.2: Fontu %75 küçült, Y ekseninde 1.5 piksel daha yukarı yaz (Alt çizgiye taşmayı engeller)
                         fsz = (inst.y1 - inst.y0) * 0.75
                         if fsz < 6: fsz = 9
                         
                         final_text = f"{separator}{new_val}"
-                        page.insert_text((start_x, inst.y1 - (inst.y1 - inst.y0)*0.30), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
+                        page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
         output = io.BytesIO()
         doc.save(output)
