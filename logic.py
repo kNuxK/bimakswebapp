@@ -45,7 +45,7 @@ except ImportError:
     HAS_PYMUPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 117.0 GÜNCELLEMESİ)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 118.0 ROL MOTORU EKLENDİ)
 # ==============================================================================
 
 def get_gsheets_client():
@@ -70,7 +70,6 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def ping_online(username):
-    """Kullanıcının sistemde işlem yaptığını algılayıp Son Görülme saatini günceller."""
     sheet = get_db_sheet()
     if not sheet: return
     try:
@@ -79,7 +78,7 @@ def ping_online(username):
             row_idx = users.index(username) + 1
             now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
             sheet.update_cell(row_idx, 8, now_str)
-    except: pass # API kotası dolarsa veya hata verirse sistemi durdurmaması için pass geçilir.
+    except: pass 
 
 def login_user(username, password):
     sheet = get_db_sheet()
@@ -88,14 +87,18 @@ def login_user(username, password):
         rows = sheet.get_all_values()
         hashed_pw = hash_password(password)
         for i, r in enumerate(rows):
-            if i == 0: continue # Başlık satırını atla
+            if i == 0: continue 
             r_user = r[0] if len(r) > 0 else ""
             r_pass = r[1] if len(r) > 1 else ""
             if str(r_user) == username and str(r_pass) == hashed_pw:
-                # Eski kayıtlarda rol yoksa otomatik "admin" sayar, yeni kayıtlarda kendi rolünü okur
-                r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "admin" 
+                # Sütun 7: Rol, Sütun 9: Özel İzinler
+                r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin" 
+                r_perms = r[8] if len(r) > 8 else ""
                 
-                # Giriş yapıldığı an Son Görülme saatini güncelle
+                # Eski hesapların bozulmaması için otomatik Admin yetkisi
+                if r_role.lower() == "admin" and not r_perms:
+                    r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
+                
                 now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
                 try: sheet.update_cell(i + 1, 8, now_str)
                 except: pass 
@@ -106,14 +109,15 @@ def login_user(username, password):
                     "linkedin_token": r[3] if len(r) > 3 else "",
                     "instagram_token": r[4] if len(r) > 4 else "",
                     "instagram_account_id": r[5] if len(r) > 5 else "",
-                    "role": r_role
+                    "role": r_role,
+                    "permissions": r_perms
                 }
                 return True, data
         return False, "Kullanıcı adı veya şifre hatalı!"
     except Exception as e:
         return False, f"Okuma hatası: {e}"
 
-def register_user(username, password, role="uye"):
+def register_user(username, password, role="Yeni Üye", perms=""):
     sheet = get_db_sheet()
     if not sheet: return False, "Veritabanı bağlantı hatası."
     try:
@@ -124,7 +128,8 @@ def register_user(username, password, role="uye"):
         
         hashed_pw = hash_password(password)
         now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-        new_row = [username, hashed_pw, "", "", "", "", role, now_str]
+        # Yeni üye varsayılan olarak yetkisiz doğar
+        new_row = [username, hashed_pw, "", "", "", "", role, now_str, perms]
         sheet.append_row(new_row)
         return True, "Kayıt başarılı!"
     except Exception as e:
@@ -148,7 +153,6 @@ def update_user_keys(username, genai, li, insta, insta_id):
         return False
 
 def get_all_users_status():
-    """Admin paneli için kullanıcıları, rollerini ve online/offline durumlarını çeker."""
     sheet = get_db_sheet()
     if not sheet: return []
     try:
@@ -159,27 +163,43 @@ def get_all_users_status():
         for r in rows[1:]:
             u_name = r[0] if len(r) > 0 else ""
             if not u_name: continue
-            u_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "admin"
+            u_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin"
             u_last = r[7] if len(r) > 7 else ""
+            u_perms = r[8] if len(r) > 8 else ""
             
             status = "🔴 Offline"
             if u_last:
                 try:
                     last_time = datetime.strptime(u_last, "%d.%m.%Y %H:%M:%S")
                     diff = now - last_time
-                    if diff.total_seconds() <= 900: # 15 dakika içinde işlem yaptıysa Online say
+                    if diff.total_seconds() <= 900: 
                         status = "🟢 Online"
                 except: pass
             
             users.append({
                 "username": u_name,
-                "role": str(u_role).capitalize(),
+                "role": u_role,
                 "status": status,
-                "last_seen": u_last if u_last else "Hiç girmedi"
+                "last_seen": u_last if u_last else "Hiç girmedi",
+                "permissions": u_perms
             })
         return users
     except Exception as e:
         return []
+
+def update_user_role_and_perms(username, new_role, new_perms):
+    sheet = get_db_sheet()
+    if not sheet: return False
+    try:
+        users = sheet.col_values(1)
+        if username in users:
+            row_idx = users.index(username) + 1
+            sheet.update_cell(row_idx, 7, new_role)
+            sheet.update_cell(row_idx, 9, new_perms)
+            return True
+        return False
+    except:
+        return False
 
 def delete_user(target_username):
     sheet = get_db_sheet()
@@ -584,7 +604,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacem
             except:
                 pass
                 
-            # AKILLI SATIR YAKALAYICI
             if smart_replacements:
                 blocks = page.get_text("dict")["blocks"]
                 for b in blocks:
@@ -603,7 +622,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacem
                                         font_sz = 9
                                     page.insert_text((bbox.x0, bbox.y1 - (bbox.height * 0.2)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
 
-            # TAM EŞLEŞME
             if exact_replacements:
                 for old_text, new_text in exact_replacements:
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
