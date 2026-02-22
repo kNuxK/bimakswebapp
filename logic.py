@@ -637,32 +637,37 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 123.2 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE DİKEY KALKAN) MOTORU
+# 🧠 V 124.0 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE TDS KALKANI) MOTORU
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
-    if not HAS_PYMUPDF or not pdf_bytes or not auto_data: return pdf_bytes
+    if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
+    if not auto_data and not exact_replacements: return pdf_bytes
+    
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
+        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME (Sadece SDS için Ana Başlığı değiştirmek için)
         old_prod = ""
-        try:
-            insts = doc[0].search_for("ÜRÜN ADI")
-            if insts:
-                words = doc[0].get_text("words")
-                tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
-                if tw:
-                    tw.sort(key=lambda x: x[0])
-                    old_prod = " ".join([w[4] for w in tw])
-        except: pass
+        if auto_data:
+            try:
+                insts = doc[0].search_for("ÜRÜN ADI")
+                if insts:
+                    words = doc[0].get_text("words")
+                    tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
+                    if tw:
+                        tw.sort(key=lambda x: x[0])
+                        old_prod = " ".join([w[4] for w in tw])
+            except: pass
 
         for page in doc:
+            # 2. LİNK KATİLİ (Tıklanabilir mavi E-Mail ve Web Bağlantılarını Temizle)
             try:
                 for link in page.get_links(): 
                     page.delete_link(link)
             except: pass
             
-            # V 123.2: SADECE SAYFA 0 (İLK SAYFA) İÇİN ÖZEL GLOBAL DEĞİŞTİRİCİLER
-            if page.number == 0:
+            # 3. SDS İÇİN SAYFA 0 (İLK SAYFA) GLOBAL DEĞİŞTİRİCİLERİ
+            if page.number == 0 and auto_data:
                 if old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                     new_prod = str(auto_data["ÜRÜN ADI"][1])
                     o_insts = page.search_for(old_prod)
@@ -674,26 +679,12 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                         fsz = (inst.y1 - inst.y0) * 0.75
                         if fsz < 6: fsz = 9
                         page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
-
-                if exact_replacements:
-                    for old_text, new_text in exact_replacements:
-                        if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
-                            text_instances = page.search_for(str(old_text))
-                            for inst in text_instances:
-                                rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
-                                page.add_redact_annot(rect, fill=(1, 1, 1))
-                                page.apply_redactions()
-                                
-                                fsz = (inst.y1 - inst.y0) * 0.75
-                                if fsz < 6: fsz = 9
-                                page.insert_text((inst.x0, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname="helv")
                 
                 # ADRES BLOK OTOMASYONU
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
                     inst_ted = page.search_for("TEDARİKÇİ")
                     
-                    # Tel: bulucu (Sadece kesin olarak iki nokta ile olanı alır ki dev boşluk silmesin)
                     inst_tel = page.search_for("Tel:")
                     if not inst_tel: inst_tel = page.search_for("Tel :")
                     if not inst_tel: inst_tel = page.search_for("Tel")
@@ -705,7 +696,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             valid_tels.sort(key=lambda t: t.y0)
                             tel = valid_tels[0]
                             
-                            # V 123.2: Mesafe kontrolü, eğer çok uzunsa (150px den fazlaysa) iptal et ki PDF silinmesin.
                             if (tel.y0 - ted.y1) < 150: 
                                 words_pg0 = page.get_text("words")
                                 t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
@@ -724,46 +714,59 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                         page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
                                         y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI (Tüm Sayfalar için Jilet Hizalama)
-            words = page.get_text("words")
-            for key, (separator, new_val) in auto_data.items():
-                if not new_val or key == "ADDRESS" or key == "ÜRÜN ADI": continue 
-                
-                insts = page.search_for(key)
-                for inst in insts:
-                    tw = [w for w in words if w[1] < inst.y1+3 and w[3] > inst.y0-3 and w[0] >= inst.x1-2]
-                    if tw:
-                        min_x = min(w[0] for w in tw)
-                        max_x = max(w[2] for w in tw)
-                        
-                        # V 123.2: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ
-                        start_x = min_x
-                        if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
-                            start_x = inst.x0 + 155 # Sol blok için sabit hiza
-                        elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
-                            start_x = inst.x0 + 35  # Alt sol kolon hiza
-                        elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
-                            start_x = inst.x0 + 95  # Sağ blok için sabit hiza
-                        else:
-                            start_x = inst.x1 + 8 # Diğerleri için kelimeden hemen sonra başla
-                        
-                        safe_left_bound = inst.x1 + 2
-                        start_x = max(start_x, safe_left_bound)
-                        
-                        wipe_x = min(min_x, start_x) - 2
-                        wipe_x = max(wipe_x, safe_left_bound)
-                        
-                        # V 123.2: Yüksekliği kelime boyutu kadar sabitliyoruz ki alttaki çizgileri/gri barları yutmasın
-                        rect = fitz.Rect(wipe_x, inst.y0, max_x + 5, inst.y1)
-                        page.add_redact_annot(rect, fill=(1,1,1))
-                        page.apply_redactions()
-                        
-                        # V 123.2: Fontu %75 küçült, Y ekseninde 1.5 piksel daha yukarı yaz (Alt çizgiye taşmayı engeller)
-                        fsz = (inst.y1 - inst.y0) * 0.75
-                        if fsz < 6: fsz = 9
-                        
-                        final_text = f"{separator}{new_val}"
-                        page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
+            # 4. AKILLI BAŞLIK YAKALAYICI (SDS)
+            if auto_data:
+                words = page.get_text("words")
+                for key, (separator, new_val) in auto_data.items():
+                    if not new_val or key == "ADDRESS" or key == "ÜRÜN ADI": continue 
+                    
+                    insts = page.search_for(key)
+                    for inst in insts:
+                        tw = [w for w in words if w[1] < inst.y1+3 and w[3] > inst.y0-3 and w[0] >= inst.x1-2]
+                        if tw:
+                            min_x = min(w[0] for w in tw)
+                            max_x = max(w[2] for w in tw)
+                            
+                            # V 124.0: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ ("R" Harfine Göre)
+                            start_x = min_x
+                            if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
+                                start_x = inst.x0 + 132 # ŞİRKETİ yazısındaki R harfinin tam hizası!
+                            elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
+                                start_x = inst.x0 + 35  # Alt sol kolon hiza
+                            elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
+                                start_x = inst.x0 + 95  # Sağ blok için sabit hiza
+                            else:
+                                start_x = inst.x1 + 8 
+                            
+                            safe_left_bound = inst.x1 + 2
+                            start_x = max(start_x, safe_left_bound)
+                            
+                            wipe_x = min(min_x, start_x) - 2
+                            wipe_x = max(wipe_x, safe_left_bound)
+                            
+                            rect = fitz.Rect(wipe_x, inst.y0, max_x + 5, inst.y1)
+                            page.add_redact_annot(rect, fill=(1,1,1))
+                            page.apply_redactions()
+                            
+                            fsz = (inst.y1 - inst.y0) * 0.75
+                            if fsz < 6: fsz = 9
+                            
+                            final_text = f"{separator}{new_val}"
+                            page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
+
+            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin Lazer Kesim)
+            if exact_replacements:
+                for old_text, new_text in exact_replacements:
+                    if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
+                        text_instances = page.search_for(str(old_text))
+                        for inst in text_instances:
+                            rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
+                            page.add_redact_annot(rect, fill=(1, 1, 1))
+                            page.apply_redactions()
+                            
+                            fsz = (inst.y1 - inst.y0) * 0.75
+                            if fsz < 6: fsz = 9
+                            page.insert_text((inst.x0, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname="helv")
 
         output = io.BytesIO()
         doc.save(output)
