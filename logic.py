@@ -637,7 +637,7 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 124.2 - LAZER KESİM REDAKSİYON (DİNAMİK KİLİTLİ VE FONT KÜÇÜLTME MOTORU)
+# 🧠 V 125.0 - LAZER KESİM REDAKSİYON (16 MADDE ACİL TELEFON VE JİLET HİZALAMA)
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
@@ -660,7 +660,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                         if tw:
                             tw.sort(key=lambda x: x[0])
                             old_prod = " ".join([w[4] for w in tw])
-                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası
+                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası (Acil Tel dahil hepsi buraya kilitlenecek)
                             break
             except: pass
 
@@ -671,7 +671,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     page.delete_link(link)
             except: pass
             
-            # V 124.2: ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ (TÜM SAYFALAR İÇİN AKTİF)
+            # V 125.0: ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ (TÜM SAYFALAR İÇİN AKTİF)
             if auto_data and old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                 new_prod = str(auto_data["ÜRÜN ADI"][1])
                 o_insts = page.search_for(old_prod)
@@ -683,7 +683,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     if page.number == 0:
                         fsz = (inst.y1 - inst.y0) * 0.75
                     else:
-                        fsz = (inst.y1 - inst.y0) * 0.60 # Diğer sayfalardaki tablolara sığması için font küçültüldü
+                        fsz = (inst.y1 - inst.y0) * 0.60 
                         
                     if fsz < 5: fsz = 8
                     page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
@@ -723,7 +723,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                         page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
                                         y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI (SDS Diğer Bilgileri)
+            # 4. AKILLI BAŞLIK YAKALAYICI (SDS Diğer Bilgileri ve ACİL TELEFON)
             if auto_data:
                 words = page.get_text("words")
                 for key, (separator, new_val) in auto_data.items():
@@ -737,14 +737,15 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             max_x = max(w[2] for w in tw)
                             
                             start_x = min_x
-                            if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
+                            # V 125.0: Acil Durum Telefonu 1. Sayfa Tablosunda Ürün Adı ile kilitlenir
+                            if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ", "ACİL DURUM TELEFONU"]:
                                 start_x = table_prod_x0 
                             elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
                                 start_x = inst.x0 + 35  
                             elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
                                 start_x = inst.x0 + 95  
                             else:
-                                start_x = inst.x1 + 8 
+                                start_x = inst.x1 + 4 
                             
                             safe_left_bound = inst.x1 + 2
                             start_x = max(start_x, safe_left_bound)
@@ -762,7 +763,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             final_text = f"{separator}{new_val}"
                             page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS)
+            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin Lazer Kesim)
             if exact_replacements:
                 for old_text, new_text in exact_replacements:
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
