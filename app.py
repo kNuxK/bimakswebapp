@@ -15,6 +15,8 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'current_user' not in st.session_state:
     st.session_state['current_user'] = ""
+if 'role' not in st.session_state:
+    st.session_state['role'] = "uye"
 
 def t(key): return config.LANGUAGES.get(st.session_state.get('lang', 'TR'), config.LANGUAGES['TR']).get(key, key)
 def _(tr, en, ru, ar):
@@ -41,6 +43,7 @@ if not st.session_state['logged_in']:
                     if success:
                         st.session_state['logged_in'] = True
                         st.session_state['current_user'] = log_user
+                        st.session_state['role'] = data.get('role', 'uye')
                         st.session_state['settings_db'] = {
                             "genai_key": data.get('genai_key', ''), 
                             "linkedin_token": data.get('linkedin_token', ''), 
@@ -65,7 +68,7 @@ if not st.session_state['logged_in']:
                     st.warning("Kullanıcı adı ve şifre en az 3 karakter olmalıdır.")
                 else:
                     with st.spinner("Kayıt yapılıyor..."):
-                        success, msg = logic.register_user(reg_user, reg_pass)
+                        success, msg = logic.register_user(reg_user, reg_pass, "uye")
                         if success: st.success(msg)
                         else: st.error(msg)
     st.stop()
@@ -177,6 +180,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             sy_sio2 = st.text_input(t('sio2_opt'), key="sy_sio2")
 
         if st.button(t('btn_analyze'), type="primary"):
+            logic.ping_online(st.session_state['current_user'])
             lsi_val, rsi_val = logic.calculate_lsi(sy_ph, sy_tds, sy_temp, sy_ca, sy_alk)
             an_txt = f"""
             MAKEUP SUYU: pH:{mk_ph}, TDS:{mk_tds}, Ca:{mk_ca}, Alk:{mk_alk}, İletkenlik:{mk_cond}, Cl:{mk_cl}, SO4:{mk_so4}, Fe:{mk_fe}, SiO2:{mk_sio2}
@@ -222,6 +226,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         
         st.markdown("---")
         if st.button(t('roi_calc_btn'), type="primary"):
+            logic.ping_online(st.session_state['current_user'])
             res = logic.calculate_advanced_roi(bd, hours, coc_curr, coc_targ, cost_w, cost_e, scale, cost_c)
             if res:
                 new_chem_cost = res['w_new'] * (dose / 1000) * price 
@@ -241,6 +246,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         st.subheader(t('ocr_title')); st.info(t('ocr_desc'))
         ocr_file = st.file_uploader(_("Rapor Fotoğrafı", "Report Photo", "Фото отчета", "صورة التقرير"), type=['jpg', 'png', 'jpeg'])
         if ocr_file and st.button(t('ocr_btn')):
+            logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             ocr_prompt = f"""
             ACT AS: Senior Water Treatment Engineer.
@@ -255,12 +261,13 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     elif st.session_state['bimaks_sub_tab'] == 'REG':
         st.subheader(t('reg_title')); q_reg = st.text_input(_("Soru:", "Question:", "Вопрос:", "سؤال:"), placeholder=t('reg_ph'))
         if st.button(_("Araştır", "Search", "Поиск", "بحث")):
+            logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             reg_prompt = f"ACT AS: Regulatory Expert. QUESTION: {q_reg}. CRITICAL LANGUAGE RULE: YOU MUST WRITE YOUR ENTIRE RESPONSE STRICTLY IN {lang_name.upper()}."
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. BAYİ SDS/TDS ÜRETİCİ (YENİ V 116.0 - AKILLI SATIR DEĞİŞTİRİCİ)
+    # E. BAYİ SDS/TDS ÜRETİCİ
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
@@ -289,7 +296,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             smart_replacements = []
             
             if doc_type == "SDS":
-                # --- MENÜ 1: TAM EŞLEŞME (Eski Değeri Girmek Gerekir) ---
                 with st.expander("📝 1. Tam Eşleşmeli Değişiklikler (Eski değeri girmeniz gerekir)", expanded=False):
                     st.caption("Bu bölümdeki metinler PDF'in herhangi bir yerinde (cümle içinde vb.) geçebileceği için tam olarak eski kelimeyi yazmanız gereklidir.")
                     
@@ -320,7 +326,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     if new_add: exact_replacements.append((old_add, new_add))
                     if new_per: exact_replacements.append((old_per, new_per))
 
-                # --- MENÜ 2: AKILLI SATIR DEĞİŞTİRİCİ (Yeni Değer Yeterli) ---
                 with st.expander("🧠 2. Akıllı Satır Değiştiriciler (Eski değere gerek YOK!)", expanded=True):
                     st.caption("Sistem buradaki başlıkları otomatik bulur, karşısında ne yazarsa yazsın o satırı tamamen silip sizin yazdığınız yeni bilgiyi oraya ekler.")
 
@@ -398,6 +403,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
 
             st.markdown("---")
             if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
+                logic.ping_online(st.session_state['current_user'])
                 if sds_file:
                     with st.spinner(f"{doc_type} Maskeleniyor ve Oluşturuluyor..."):
                         pdf_out = logic.create_dealer_pdf(
@@ -451,6 +457,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
         c_lim = st.number_input(t('prompt_limit'), 500, 10000, 3000, 100)
         
         if st.button(t('btn_create'), type="primary"):
+            logic.ping_online(st.session_state['current_user'])
             clean_prod = None if not p_ref or p_ref.strip() == "" else p_ref
             
             prompt = logic.construct_prompt_text(role_c, m_topic, t_aud, t_plat, clean_prod, c_lim, st.session_state.get('lang', 'TR'), p_link)
@@ -493,6 +500,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
                 else: st.video(up)
             st.markdown("---")
             if st.button(t('publish'), type="primary"): 
+                logic.ping_online(st.session_state['current_user'])
                 r = logic.post_to_linkedin_real(val, up.getvalue() if up else None, up.type if up else "", st.session_state['settings_db']["linkedin_token"])
                 if "✅" in r: logic.save_history_entry(m_topic, role_c); st.balloons(); st.success(r)
                 else: st.error(r)
@@ -512,6 +520,7 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
         c_lim = st.number_input(t('prompt_limit'), 500, 2200, 2000, 100, key="in_l")
         
         if st.button(t('btn_create'), type="primary", key="in_btn"):
+            logic.ping_online(st.session_state['current_user'])
             st.session_state['draft_prompt'] = logic.construct_prompt_text(role_c, m_topic, "Followers", "Instagram", None, c_lim, st.session_state['lang'])
             with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...")):
                 res = logic.get_gemini_response_from_manual(st.session_state['draft_prompt'], st.session_state['settings_db']["genai_key"])
@@ -552,7 +561,7 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
             for t_tag in st.session_state['insta_tags_list']: draw.text((t_tag['x']*w, t_tag['y']*h), f"@{t_tag['u']}", fill=t_tag.get('c', '#FFFF00'))
             if tag_u: draw.text((t_x/100*w, t_y/100*h), f"@{tag_u}", fill=tag_color)
             st.image(preview_img, caption=_("Önizleme (Canlı)", "Live Preview", "Предпросмотр", "معاينة حية"), use_container_width=True)
-            if st.button(t('publish_insta'), type="primary"): st.warning("⚠️ Web API Simulasyon Modundadır.")
+            if st.button(t('publish_insta'), type="primary"): logic.ping_online(st.session_state['current_user']); st.warning("⚠️ Web API Simulasyon Modundadır.")
 
 # 4. AYARLAR
 elif st.session_state.get('show_settings'):
@@ -567,39 +576,54 @@ elif st.session_state.get('show_settings'):
         if st.button(_("Sil", "Delete", "Удалить", "حذف")): st.session_state['personas_db'] = [p for p in st.session_state['personas_db'] if p.get(st.session_state['lang']) != dp]; st.rerun()
         
         st.markdown("---")
-        with st.expander(t('set_admin')):
-            ap = st.text_input(_("Admin Şifresi", "Admin Password", "Пароль администратора", "كلمة مرور المسؤول"), type="password")
-            if ap == "opop0":
+        
+        # --- YENİ V 117.0: ROL BAZLI ERİŞİM VE YÖNETİM PANELİ ---
+        if st.session_state.get('role') == 'admin':
+            with st.expander("🛠️ Admin / Yönetim Paneli", expanded=True):
+                st.subheader(_("👥 Kullanıcı Yönetimi & Online Takip", "👥 User Management", "👥 Управление пользователями", "👥 إدارة المستخدمين"))
                 
-                st.markdown("---")
-                st.subheader(_("👥 Kullanıcı Yönetimi", "👥 User Management", "👥 Управление пользователями", "👥 إدارة المستخدمين"))
-                
-                all_users = logic.get_all_users()
-                if all_users:
-                    st.write("**Mevcut Kullanıcılar:**")
-                    for u in all_users:
-                        col_u, col_del = st.columns([8, 2])
-                        col_u.code(u)
-                        if col_del.button("🗑️ Sil", key=f"del_user_{u}"):
-                            if u == st.session_state['current_user']:
-                                st.error("Aktif (kendi) hesabınızı silemezsiniz!")
-                            else:
+                users_data = logic.get_all_users_status()
+                if users_data:
+                    online_count = sum(1 for u in users_data if 'Online' in u['status'])
+                    st.info(f"📊 **Sistem İstatistiği:** Toplam {len(users_data)} kullanıcı | 🟢 {online_count} Çevrimiçi")
+                    
+                    c_h1, c_h2, c_h3, c_h4, c_h5 = st.columns([3, 2, 2, 3, 2])
+                    c_h1.markdown("**Kullanıcı**")
+                    c_h2.markdown("**Yetki**")
+                    c_h3.markdown("**Durum**")
+                    c_h4.markdown("**Son İşlem**")
+                    c_h5.markdown("**Aksiyon**")
+                    st.markdown("---")
+                    
+                    for u in users_data:
+                        cu1, cu2, cu3, cu4, cu5 = st.columns([3, 2, 2, 3, 2])
+                        cu1.code(u['username'])
+                        cu2.write(u['role'])
+                        cu3.markdown(u['status'])
+                        cu4.caption(u['last_seen'])
+                        
+                        if u['username'] == st.session_state['current_user']:
+                            cu5.success("Sen")
+                        else:
+                            if cu5.button("🗑️ Sil", key=f"del_user_{u['username']}"):
                                 with st.spinner("Siliniyor..."):
-                                    s, m = logic.delete_user(u)
+                                    s, m = logic.delete_user(u['username'])
                                     if s: st.success(m); time.sleep(1); st.rerun()
                                     else: st.error(m)
                 else:
-                    st.info("Kayıtlı kullanıcı yok.")
+                    st.info("Sistemde başka kullanıcı bulunamadı.")
                     
+                st.markdown("---")
                 with st.expander("➕ Yeni Kullanıcı Ekle"):
                     n_u = st.text_input("Kullanıcı Adı", key="admin_add_u")
                     n_p = st.text_input("Şifre", key="admin_add_p")
+                    n_r = st.selectbox("Kullanıcı Yetkisi", ["uye", "admin"], key="admin_add_r")
                     if st.button("Hesap Oluştur", type="primary"):
                         if len(n_u) < 3 or len(n_p) < 3:
                             st.warning("Kullanıcı adı ve şifre en az 3 karakter olmalı.")
                         else:
                             with st.spinner("Ekleniyor..."):
-                                s, m = logic.register_user(n_u, n_p)
+                                s, m = logic.register_user(n_u, n_p, n_r)
                                 if s: st.success(f"'{n_u}' başarıyla oluşturuldu!"); time.sleep(1); st.rerun()
                                 else: st.error(m)
                 
@@ -622,7 +646,6 @@ elif st.session_state.get('show_settings'):
                 li = st.checkbox(" > LinkedIn", st.session_state['settings_db'].get("enable_linkedin"))
                 ins = st.checkbox(" > Instagram", st.session_state['settings_db'].get("enable_instagram"))
                 pe = st.checkbox(_("Problem Çözücü", "Problem Solver", "Решатель проблем", "حل المشكلات"), st.session_state['settings_db'].get("enable_problem_solver"))
-                
                 sds_cb = st.checkbox(" > Bayi SDS/TDS", st.session_state['settings_db'].get("enable_dealer_sds", False))
                 qe = st.checkbox(_("Teklif", "Quote", "Коммерческое предложение", "اقتباس"), st.session_state['settings_db'].get("enable_quote"))
                 
@@ -649,7 +672,7 @@ elif st.session_state.get('show_settings'):
             with st.spinner("Veritabanına kaydediliyor..."):
                 is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
                 if is_saved:
-                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ в قاعدة البيانات!"))
+                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!"))
                 else:
                     st.error("Veritabanına kaydedilirken bir hata oluştu.")
             time.sleep(1); st.rerun()
@@ -729,5 +752,6 @@ elif st.session_state.get('active_tab') == t('btn_quote') and not st.session_sta
         q_show_total = st.checkbox(t('q_show_total'), value=True)
         q_note = st.text_area(t('q_note_label'))
         if st.button(t('q_create')):
+            logic.ping_online(st.session_state['current_user'])
             pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
             st.download_button(_("İndir", "Download", "Скачать", "تحميل"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
