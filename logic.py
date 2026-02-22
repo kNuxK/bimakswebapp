@@ -637,7 +637,7 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 124.0 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE TDS KALKANI) MOTORU
+# 🧠 V 124.1 - LAZER KESİM REDAKSİYON (DİNAMİK KİLİTLİ HİZALAMA MOTORU)
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
@@ -646,17 +646,22 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME (Sadece SDS için Ana Başlığı değiştirmek için)
+        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME & TABLODAKİ X KOORDİNATINI YAKALAMA
         old_prod = ""
+        table_prod_x0 = 150 # Güvenlik için varsayılan fallback değeri
+        
         if auto_data:
             try:
-                insts = doc[0].search_for("ÜRÜN ADI")
-                if insts:
-                    words = doc[0].get_text("words")
-                    tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
-                    if tw:
-                        tw.sort(key=lambda x: x[0])
-                        old_prod = " ".join([w[4] for w in tw])
+                for page in doc:
+                    insts = page.search_for("ÜRÜN ADI")
+                    if insts:
+                        words = page.get_text("words")
+                        tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
+                        if tw:
+                            tw.sort(key=lambda x: x[0])
+                            old_prod = " ".join([w[4] for w in tw])
+                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası (Altındakiler de tam buraya kilitlenecek!)
+                            break
             except: pass
 
         for page in doc:
@@ -727,10 +732,10 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             min_x = min(w[0] for w in tw)
                             max_x = max(w[2] for w in tw)
                             
-                            # V 124.0: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ ("R" Harfine Göre)
+                            # V 124.1: ÜRÜN ADI İLE BİREBİR HİZALAMA KİLİDİ (Görseldeki "R" Hizasını Dinamik Yakalar)
                             start_x = min_x
                             if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
-                                start_x = inst.x0 + 132 # ŞİRKETİ yazısındaki R harfinin tam hizası!
+                                start_x = table_prod_x0 # Ürün adının tam olarak başladığı X koordinatı!
                             elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
                                 start_x = inst.x0 + 35  # Alt sol kolon hiza
                             elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
