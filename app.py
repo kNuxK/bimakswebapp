@@ -370,7 +370,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 123.2 - 14 MADDELİ JİLET EDİTÖR)
+    # F. BAYİ SDS/TDS ÜRETİCİ (V 124.0 - JİLET HİZALAMA VE TDS LAZER TARAMA)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -398,8 +398,8 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             exact_replacements = []
             
             if doc_type == "SDS":
-                # V 123.2 - TEK MENÜ, TAM OTONOM 14 MADDE (Acil Tel Kaldırıldı, Jilet Hizalama)
-                with st.expander("🧠 Akıllı Belge Düzenleyici (Tam Otonom)", expanded=True):
+                # V 124.0 - SDS İÇİN 14 MADDELİ JİLET EDİTÖR
+                with st.expander("🧠 Akıllı Belge Düzenleyici (SDS Otonom)", expanded=True):
                     st.caption("Sadece yeni değerleri girin. Sistem eski yazıları bulup hizalarını ve arka plan çizgilerini hiç bozmadan milimetrik olarak yenisiyle değiştirir. Eski değeri bilmenize gerek yoktur!")
                     
                     c_s1, c_s2 = st.columns(2)
@@ -423,7 +423,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_cert_date = st.text_input("14. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
                         new_cert_no = st.text_input("15. Sertifika No", placeholder="Örn: YENİ-NO")
 
-                    # Motora gönderilecek Lazer Kesim Komutları ("Tel:" gibi olanlar tam eşleşmeli aranır ki çift nokta atmasın)
                     auto_data = {
                         "ÜRÜN ADI": ("", new_prod),
                         "Oluşturma Tarihi": ("", new_cdate),
@@ -441,6 +440,26 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         "Sertifika Geçerlilik Süresi": ("", new_cert_date),
                         "Sertifika No": ("", new_cert_no)
                     }
+
+            elif doc_type == "TDS":
+                # V 124.0 - TDS İÇİN LAZER TARAMA MOTORU
+                with st.expander("🧠 TDS Akıllı Belge Düzenleyici (Lazer Tarama)", expanded=True):
+                    st.caption("TDS belgelerinde 'Ürün Adı:' gibi sabit başlıklar olmadığından, değiştirmek istediğiniz eski kelimeleri tam olarak girmeniz gerekir. Sistem bu kelimeleri bulup TDS'in her yerinde yenisiyle değiştirecektir.")
+                    
+                    c_t1, c_t2 = st.columns(2)
+                    with c_t1:
+                        old_tds_prod = st.text_input("Eski Ürün Adı", value="MAKS 400PD")
+                        old_tds_type = st.text_input("Eski Ürün Tipi", value="TERS OSMOZ ANTİSKALANTI")
+                        old_tds_sup = st.text_input("Eski Tedarikçi", value="BİMAKS")
+                        
+                    with c_t2:
+                        new_tds_prod = st.text_input("Yeni Ürün Adı", placeholder="Örn: YENİ ÜRÜN")
+                        new_tds_type = st.text_input("Yeni Ürün Tipi", placeholder="Örn: YENİ ANTİSKALANT")
+                        new_tds_sup = st.text_input("Yeni Tedarikçi", placeholder="Örn: YENİ FİRMA")
+                        
+                    if new_tds_prod: exact_replacements.append((old_tds_prod, new_tds_prod))
+                    if new_tds_type: exact_replacements.append((old_tds_type, new_tds_type))
+                    if new_tds_sup: exact_replacements.append((old_tds_sup, new_tds_sup))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=False):
                 st.caption("Logonun ve İsteğe Bağlı Beyaz Maskelerin yerini X ve Y olarak ayarlayın.")
