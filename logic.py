@@ -637,7 +637,7 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 124.1 - LAZER KESİM REDAKSİYON (DİNAMİK KİLİTLİ HİZALAMA MOTORU)
+# 🧠 V 124.2 - LAZER KESİM REDAKSİYON (DİNAMİK KİLİTLİ VE FONT KÜÇÜLTME MOTORU)
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
@@ -660,7 +660,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                         if tw:
                             tw.sort(key=lambda x: x[0])
                             old_prod = " ".join([w[4] for w in tw])
-                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası (Altındakiler de tam buraya kilitlenecek!)
+                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası
                             break
             except: pass
 
@@ -671,21 +671,25 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     page.delete_link(link)
             except: pass
             
-            # 3. SDS İÇİN SAYFA 0 (İLK SAYFA) GLOBAL DEĞİŞTİRİCİLERİ
-            if page.number == 0 and auto_data:
-                if old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
-                    new_prod = str(auto_data["ÜRÜN ADI"][1])
-                    o_insts = page.search_for(old_prod)
-                    for inst in o_insts:
-                        rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
-                        page.add_redact_annot(rect, fill=(1,1,1))
-                        page.apply_redactions()
-                        
+            # V 124.2: ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ (TÜM SAYFALAR İÇİN AKTİF)
+            if auto_data and old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
+                new_prod = str(auto_data["ÜRÜN ADI"][1])
+                o_insts = page.search_for(old_prod)
+                for inst in o_insts:
+                    rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
+                    page.add_redact_annot(rect, fill=(1,1,1))
+                    page.apply_redactions()
+                    
+                    if page.number == 0:
                         fsz = (inst.y1 - inst.y0) * 0.75
-                        if fsz < 6: fsz = 9
-                        page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
-                
-                # ADRES BLOK OTOMASYONU
+                    else:
+                        fsz = (inst.y1 - inst.y0) * 0.60 # Diğer sayfalardaki tablolara sığması için font küçültüldü
+                        
+                    if fsz < 5: fsz = 8
+                    page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
+
+            # 3. SADECE SAYFA 0'A ÖZEL ADRES BLOK OTOMASYONU
+            if page.number == 0 and auto_data:
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
                     inst_ted = page.search_for("TEDARİKÇİ")
@@ -719,7 +723,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                         page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
                                         y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI (SDS)
+            # 4. AKILLI BAŞLIK YAKALAYICI (SDS Diğer Bilgileri)
             if auto_data:
                 words = page.get_text("words")
                 for key, (separator, new_val) in auto_data.items():
@@ -732,14 +736,13 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             min_x = min(w[0] for w in tw)
                             max_x = max(w[2] for w in tw)
                             
-                            # V 124.1: ÜRÜN ADI İLE BİREBİR HİZALAMA KİLİDİ (Görseldeki "R" Hizasını Dinamik Yakalar)
                             start_x = min_x
                             if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
-                                start_x = table_prod_x0 # Ürün adının tam olarak başladığı X koordinatı!
+                                start_x = table_prod_x0 
                             elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
-                                start_x = inst.x0 + 35  # Alt sol kolon hiza
+                                start_x = inst.x0 + 35  
                             elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
-                                start_x = inst.x0 + 95  # Sağ blok için sabit hiza
+                                start_x = inst.x0 + 95  
                             else:
                                 start_x = inst.x1 + 8 
                             
@@ -759,7 +762,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             final_text = f"{separator}{new_val}"
                             page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin Lazer Kesim)
+            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS)
             if exact_replacements:
                 for old_text, new_text in exact_replacements:
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
