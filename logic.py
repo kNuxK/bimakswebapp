@@ -45,7 +45,7 @@ except ImportError:
     HAS_PYMUPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 117.0 GÜNCELLEMESİ)
 # ==============================================================================
 
 def get_gsheets_client():
@@ -69,30 +69,62 @@ def get_db_sheet():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+def ping_online(username):
+    """Kullanıcının sistemde işlem yaptığını algılayıp Son Görülme saatini günceller."""
+    sheet = get_db_sheet()
+    if not sheet: return
+    try:
+        users = sheet.col_values(1)
+        if username in users:
+            row_idx = users.index(username) + 1
+            now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+            sheet.update_cell(row_idx, 8, now_str)
+    except: pass # API kotası dolarsa veya hata verirse sistemi durdurmaması için pass geçilir.
+
 def login_user(username, password):
     sheet = get_db_sheet()
     if not sheet: return False, "Veritabanı bağlantı hatası."
     try:
-        records = sheet.get_all_records()
+        rows = sheet.get_all_values()
         hashed_pw = hash_password(password)
-        for row in records:
-            if str(row.get('username')) == username and str(row.get('password')) == hashed_pw:
-                return True, row
+        for i, r in enumerate(rows):
+            if i == 0: continue # Başlık satırını atla
+            r_user = r[0] if len(r) > 0 else ""
+            r_pass = r[1] if len(r) > 1 else ""
+            if str(r_user) == username and str(r_pass) == hashed_pw:
+                # Eski kayıtlarda rol yoksa otomatik "admin" sayar, yeni kayıtlarda kendi rolünü okur
+                r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "admin" 
+                
+                # Giriş yapıldığı an Son Görülme saatini güncelle
+                now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+                try: sheet.update_cell(i + 1, 8, now_str)
+                except: pass 
+                
+                data = {
+                    "username": r_user,
+                    "genai_key": r[2] if len(r) > 2 else "",
+                    "linkedin_token": r[3] if len(r) > 3 else "",
+                    "instagram_token": r[4] if len(r) > 4 else "",
+                    "instagram_account_id": r[5] if len(r) > 5 else "",
+                    "role": r_role
+                }
+                return True, data
         return False, "Kullanıcı adı veya şifre hatalı!"
     except Exception as e:
         return False, f"Okuma hatası: {e}"
 
-def register_user(username, password):
+def register_user(username, password, role="uye"):
     sheet = get_db_sheet()
     if not sheet: return False, "Veritabanı bağlantı hatası."
     try:
-        records = sheet.get_all_records()
-        for row in records:
-            if str(row.get('username')) == username:
+        rows = sheet.get_all_values()
+        for r in rows:
+            if len(r) > 0 and str(r[0]) == username:
                 return False, "Bu kullanıcı adı zaten alınmış!"
         
         hashed_pw = hash_password(password)
-        new_row = [username, hashed_pw, "", "", "", ""]
+        now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        new_row = [username, hashed_pw, "", "", "", "", role, now_str]
         sheet.append_row(new_row)
         return True, "Kayıt başarılı!"
     except Exception as e:
@@ -115,13 +147,38 @@ def update_user_keys(username, genai, li, insta, insta_id):
         st.error(f"Güncelleme Hatası: {e}")
         return False
 
-def get_all_users():
+def get_all_users_status():
+    """Admin paneli için kullanıcıları, rollerini ve online/offline durumlarını çeker."""
     sheet = get_db_sheet()
     if not sheet: return []
     try:
-        records = sheet.get_all_records()
-        return [str(r.get('username')) for r in records if r.get('username')]
-    except:
+        rows = sheet.get_all_values()
+        if len(rows) <= 1: return []
+        users = []
+        now = datetime.now()
+        for r in rows[1:]:
+            u_name = r[0] if len(r) > 0 else ""
+            if not u_name: continue
+            u_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "admin"
+            u_last = r[7] if len(r) > 7 else ""
+            
+            status = "🔴 Offline"
+            if u_last:
+                try:
+                    last_time = datetime.strptime(u_last, "%d.%m.%Y %H:%M:%S")
+                    diff = now - last_time
+                    if diff.total_seconds() <= 900: # 15 dakika içinde işlem yaptıysa Online say
+                        status = "🟢 Online"
+                except: pass
+            
+            users.append({
+                "username": u_name,
+                "role": str(u_role).capitalize(),
+                "status": status,
+                "last_seen": u_last if u_last else "Hiç girmedi"
+            })
+        return users
+    except Exception as e:
         return []
 
 def delete_user(target_username):
@@ -515,21 +572,19 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
-# --- YENİ V 116.0: İKİ YÖNLÜ METİN MOTORU (AKILLI SATIR & TAM EŞLEŞME) ---
 def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes:
         return pdf_bytes
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         for page in doc:
-            # 1. Tıklanabilir linkleri kökten siler (Link Killer)
             try:
                 for link in page.get_links():
                     page.delete_link(link)
             except:
                 pass
                 
-            # 2. AKILLI SATIR YAKALAYICI (Smart Replace)
+            # AKILLI SATIR YAKALAYICI
             if smart_replacements:
                 blocks = page.get_text("dict")["blocks"]
                 for b in blocks:
@@ -537,7 +592,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacem
                         for l in b.get("lines", []):
                             line_text = "".join([s["text"] for s in l.get("spans", [])])
                             for prefix, new_text in smart_replacements:
-                                # Satırın içinde bu başlık geçiyorsa, satırı komple bembeyaz yap ve yeni metni bas!
                                 if prefix and new_text and str(prefix) in line_text:
                                     bbox = fitz.Rect(l["bbox"])
                                     page.add_redact_annot(bbox, fill=(1, 1, 1))
@@ -549,7 +603,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacem
                                         font_sz = 9
                                     page.insert_text((bbox.x0, bbox.y1 - (bbox.height * 0.2)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
 
-            # 3. TAM EŞLEŞME (Exact Replace)
+            # TAM EŞLEŞME
             if exact_replacements:
                 for old_text, new_text in exact_replacements:
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
@@ -568,7 +622,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacem
     except Exception as e:
         return pdf_bytes
 
-# --- YENİ V 116.0: BAYİ SDS/TDS MASKELEME MOTORU (GÜNCELLENDİ) ---
 def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
                       top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                       bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
@@ -644,7 +697,6 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
     except Exception as e:
         return None
 
-# --- YENİ V 116.0: GÖRSEL CANLI ÖNİZLEME MOTORU (GÜNCELLENDİ) ---
 def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address, 
                          top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                          bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
