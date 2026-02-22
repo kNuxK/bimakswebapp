@@ -370,7 +370,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 123.1 - 15 MADDELİ JİLET EDİTÖR)
+    # F. BAYİ SDS/TDS ÜRETİCİ (V 123.2 - 14 MADDELİ JİLET EDİTÖR)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -398,23 +398,23 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             exact_replacements = []
             
             if doc_type == "SDS":
-                # V 123.1 - TEK MENÜ, TAM OTONOM 15 MADDE (Acil Telefon İptal Edildi)
+                # V 123.2 - TEK MENÜ, TAM OTONOM 14 MADDE (Acil Tel Kaldırıldı, Jilet Hizalama)
                 with st.expander("🧠 Akıllı Belge Düzenleyici (Tam Otonom)", expanded=True):
                     st.caption("Sadece yeni değerleri girin. Sistem eski yazıları bulup hizalarını ve arka plan çizgilerini hiç bozmadan milimetrik olarak yenisiyle değiştirir. Eski değeri bilmenize gerek yoktur!")
                     
                     c_s1, c_s2 = st.columns(2)
                     
                     with c_s1:
-                        new_prod = st.text_input("1. Yeni Ürün Adı", placeholder="Örn: YENİ ÜRÜN (İlk sayfadaki tüm başlıkları değiştirir)")
+                        new_prod = st.text_input("1. Yeni Ürün Adı", placeholder="Örn: YENİ ÜRÜN (Sadece ilk sayfayı değiştirir)")
                         new_cdate = st.text_input("2. Oluşturma Tarihi", placeholder="Örn: 15.06.2024")
                         new_rdate = st.text_input("3. Revizyon Tarihi", placeholder="Örn: 20.08.2025")
                         new_vers = st.text_input("4. Versiyon Numarası", placeholder="Örn: 01")
                         new_chem = st.text_input("5. Kimyasal Adı", placeholder="Örn: TEMİZLEYİCİ")
                         new_sup = st.text_input("6. Tedarikçi Firma", placeholder="Örn: YENİ FİRMA LTD. ŞTİ.")
                         new_add = st.text_area("7. Tedarikçi Adresi", placeholder="Örn: Yeni Mah. Sokak No:1\nİlçe / Şehir", height=68)
-                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                     
                     with c_s2:
+                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                         new_fax = st.text_input("9. Tedarikçi Fax", placeholder="Örn: 0 212 123 45 67")
                         new_mail = st.text_input("10. Tedarikçi Email", placeholder="Örn: info@bayi.com")
                         new_web = st.text_input("11. Tedarikçi Web Adresi", placeholder="Örn: www.bayi.com")
@@ -423,7 +423,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_cert_date = st.text_input("14. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
                         new_cert_no = st.text_input("15. Sertifika No", placeholder="Örn: YENİ-NO")
 
-                    # Motora gönderilecek Lazer Kesim Komutları (Çift nokta sorunu için boş separatör)
+                    # Motora gönderilecek Lazer Kesim Komutları ("Tel:" gibi olanlar tam eşleşmeli aranır ki çift nokta atmasın)
                     auto_data = {
                         "ÜRÜN ADI": ("", new_prod),
                         "Oluşturma Tarihi": ("", new_cdate),
@@ -432,10 +432,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         "KİMYASAL ADI": ("", new_chem),
                         "TEDARİKÇİ": ("", new_sup),
                         "ADDRESS": ("", new_add),
-                        "Tel": ("", new_tel),
-                        "Fax": ("", new_fax),
-                        "E-mail": ("", new_mail),
-                        "Web": ("", new_web),
+                        "Tel:": ("", new_tel),
+                        "Fax:": ("", new_fax),
+                        "E-mail:": ("", new_mail),
+                        "Web:": ("", new_web),
                         "BAŞVURULACAK KİŞİ": ("", new_contact),
                         "GBF Yetkili Kişi": ("", new_gbf),
                         "Sertifika Geçerlilik Süresi": ("", new_cert_date),
