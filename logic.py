@@ -639,11 +639,7 @@ def resize_for_instagram(image):
 # ==============================================================================
 # 🧠 V 123.0 - LAZER KESİM REDAKSİYON (OTONOM) MOTORU
 # ==============================================================================
-def replace_text_in_pdf_bytes(pdf_bytes, auto_data):
-    """
-    Tüm pdf'teki mavi linkleri uçurur, Ürün Adını otomatik öğrenip ana başlığı dahil her yerde değiştirir.
-    Diğer başlıklar için de SADECE başlığın sağındaki yazıyı milimetrik beyaz bantla siler.
-    """
+def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes or not auto_data: return pdf_bytes
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -654,7 +650,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data):
             insts = doc[0].search_for("ÜRÜN ADI")
             if insts:
                 words = doc[0].get_text("words")
-                # ÜRÜN ADI yazısının sağındaki kelimeleri topla
                 tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
                 if tw:
                     tw.sort(key=lambda x: x[0])
@@ -668,51 +663,63 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data):
                     page.delete_link(link)
             except: pass
             
-            # 3. ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ (Bulduğu Ürün Adını her yerde değiştirir)
+            # 3. ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
             if old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                 new_prod = str(auto_data["ÜRÜN ADI"][1])
                 o_insts = page.search_for(old_prod)
                 for inst in o_insts:
-                    page.add_redact_annot(inst, fill=(1,1,1))
+                    rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
+                    page.add_redact_annot(rect, fill=(1,1,1))
                     page.apply_redactions()
-                    fsz = inst.height * 0.85
+                    fsz = (inst.y1 - inst.y0) * 0.85
                     if fsz < 6: fsz = 9
-                    page.insert_text((inst.x0, inst.y1 - inst.height*0.2), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
+                    page.insert_text((inst.x0, inst.y1 - (inst.y1 - inst.y0)*0.15), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
 
             words = page.get_text("words")
             
-            # 4. AKILLI BAŞLIK YAKALAYICI (Sağa doğru Lazer Redaksiyon)
+            # 4. AKILLI BAŞLIK YAKALAYICI (Sağa doğru Lazer Redaksiyon - Hizalamayı Kilitler)
             for key, (separator, new_val) in auto_data.items():
                 if not new_val or key == "ADDRESS" or key == "ÜRÜN ADI": continue 
                 
                 insts = page.search_for(key)
                 for inst in insts:
-                    # Sadece o başlığın sağındaki kelimeleri (eski değeri) yakala
                     tw = [w for w in words if w[1] < inst.y1+3 and w[3] > inst.y0-3 and w[0] >= inst.x1-2]
                     if tw:
                         min_x = min(w[0] for w in tw)
-                        min_y = min(w[1] for w in tw)
                         max_x = max(w[2] for w in tw)
-                        max_y = max(w[3] for w in tw)
                         
-                        # Arkadaki çizgileri silmemek için sadece kelimenin kutusunu bembeyaz yapıyoruz
-                        rect = fitz.Rect(min_x-1, min_y-1, max_x+1, max_y+1)
+                        # V 123.0: Yüksekliği LABEL'in (inst) yüksekliğine sabitleyerek dev beyaz barları engelliyoruz.
+                        rect = fitz.Rect(min_x - 1, inst.y0 - 2, max_x + 1, inst.y1 + 2)
                         page.add_redact_annot(rect, fill=(1,1,1))
                         page.apply_redactions()
                         
-                        fsz = (max_y - min_y) * 0.85
+                        fsz = (inst.y1 - inst.y0) * 0.85
                         if fsz < 6: fsz = 9
                         
                         final_text = f"{separator}{new_val}"
-                        page.insert_text((min_x, max_y - (max_y-min_y)*0.2), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
+                        # X ekseninde kelimenin başladığı yeri kullan, Y ekseninde inst'in alt çizgisini baz al (Hizalamayı kilitler)
+                        page.insert_text((min_x, inst.y1 - (inst.y1 - inst.y0)*0.15), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
             
-            # 5. ADRES BLOK OTOMASYONU (Tedarikçi ve Tel arasındaki boşluğu siler)
+            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (Manuel Girilenler İçin - Lazer Kesim Koruma)
+            if exact_replacements:
+                for old_text, new_text in exact_replacements:
+                    if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
+                        text_instances = page.search_for(str(old_text))
+                        for inst in text_instances:
+                            rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
+                            page.add_redact_annot(rect, fill=(1, 1, 1))
+                            page.apply_redactions()
+                            
+                            fsz = (inst.y1 - inst.y0) * 0.85
+                            if fsz < 6: fsz = 9
+                            page.insert_text((inst.x0, inst.y1 - (inst.y1 - inst.y0)*0.15), str(new_text), fontsize=fsz, color=(0,0,0), fontname="helv")
+            
+            # 6. ADRES BLOK OTOMASYONU (Tedarikçi ve Tel arasındaki boşluğu siler)
             if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                 new_add = auto_data["ADDRESS"][1]
                 inst_ted = page.search_for("TEDARİKÇİ")
                 inst_tel = page.search_for("Tel")
                 if inst_ted and inst_tel:
-                    # Adres bloğunun hizasını ve alanını belirle
                     if inst_tel[0].y0 > inst_ted[0].y1:
                         t_words = [w for w in words if w[1] < inst_ted[0].y1+3 and w[3] > inst_ted[0].y0-3 and w[0] >= inst_ted[0].x1-2]
                         addr_x = min(w[0] for w in t_words) if t_words else inst_ted[0].x1 + 10
@@ -721,12 +728,10 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data):
                         addr_y1 = inst_tel[0].y0 - 2
                         
                         if addr_y1 > addr_y0:
-                            # Komple o aralığı bembeyaz boya
                             rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
                             page.add_redact_annot(rect, fill=(1,1,1))
                             page.apply_redactions()
                             
-                            # Yeni adresi satır satır yapıştır
                             y_cursor = addr_y0 + 10
                             for line in new_add.split('\n'):
                                 page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
@@ -743,11 +748,11 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                       top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                       bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                       logo_x, logo_y, logo_w, addr_x, addr_y, lang_code, 
-                      auto_data=None):
+                      auto_data=None, exact_replacements=None):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
     
-    if auto_data:
-        original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data)
+    if auto_data or exact_replacements:
+        original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data, exact_replacements)
         
     try:
         original_pdf = PdfReader(io.BytesIO(original_pdf_bytes))
@@ -807,13 +812,13 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                          top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                          bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
                          logo_x, logo_y, logo_w, addr_x, addr_y, 
-                         auto_data=None):
+                         auto_data=None, exact_replacements=None):
     width, height = 595, 842 
     img = None
     
     if original_pdf_bytes and HAS_PYMUPDF:
-        if auto_data:
-            original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data)
+        if auto_data or exact_replacements:
+            original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data, exact_replacements)
             
         try:
             doc = fitz.open(stream=original_pdf_bytes, filetype="pdf")
