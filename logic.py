@@ -45,7 +45,7 @@ except ImportError:
     HAS_PYMUPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 119.0)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 120.0 - KOTA & CACHE KORUMASI)
 # ==============================================================================
 
 def get_gsheets_client():
@@ -71,25 +71,31 @@ def get_db_sheet():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# V 119.0: Rollerin global yetkilerini tutan gizli satırı okur
+# V 120.0: Veri kaybını önlemek için Cache (Ön Bellek) Mekanizması eklendi
 def get_role_definitions():
-    sheet = get_db_sheet()
     defs = {"Admin": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
             "Bimaks Üye": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
             "Yeni Üye": ""}
-    if not sheet: return defs
     try:
+        sheet = get_db_sheet()
+        if not sheet: 
+            return st.session_state.get('cached_roles', defs)
+            
         rows = sheet.get_all_values()
         for r in rows:
             if len(r) > 0 and r[0] == '__ROLE_DEFS__':
                 defs["Admin"] = r[1] if len(r)>1 else ""
                 defs["Bimaks Üye"] = r[2] if len(r)>2 else ""
                 defs["Yeni Üye"] = r[3] if len(r)>3 else ""
+                st.session_state['cached_roles'] = defs
                 return defs
     except: pass
-    return defs
+    return st.session_state.get('cached_roles', defs)
 
 def update_role_definitions(admin_p, bimaks_p, yeni_p):
+    # Arayüzün beklememesi ve hata anında sıfırlanmaması için önce Cache güncellenir
+    st.session_state['cached_roles'] = {"Admin": admin_p, "Bimaks Üye": bimaks_p, "Yeni Üye": yeni_p}
+    
     sheet = get_db_sheet()
     if not sheet: return False
     try:
@@ -103,6 +109,25 @@ def update_role_definitions(admin_p, bimaks_p, yeni_p):
             sheet.append_row(['__ROLE_DEFS__', admin_p, bimaks_p, yeni_p])
         return True
     except: return False
+
+def ping_online(username):
+    try:
+        now = time.time()
+        last_ping = st.session_state.get('last_ping_time', 0)
+        if now - last_ping < 60: 
+            return 
+            
+        sheet = get_db_sheet()
+        if not sheet: return
+        
+        users = sheet.col_values(1)
+        if username in users:
+            row_idx = users.index(username) + 1
+            now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+            sheet.update_cell(row_idx, 8, now_str)
+            st.session_state['last_ping_time'] = now
+    except: 
+        pass 
 
 def login_user(username, password):
     sheet = get_db_sheet()
@@ -120,7 +145,6 @@ def login_user(username, password):
             if str(r_user) == username and str(r_pass) == hashed_pw:
                 r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin" 
                 
-                # Sadece giriş yapıldığı an saati günceller (Kotayı korur)
                 now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
                 try: sheet.update_cell(i + 1, 8, now_str)
                 except: pass 
@@ -179,10 +203,13 @@ def update_user_keys(username, genai, li, insta, insta_id):
         st.error(f"Güncelleme Hatası: {e}")
         return False
 
+# V 120.0: Veri kaybını önlemek için Cache Mekanizması eklendi
 def get_all_users_status():
-    sheet = get_db_sheet()
-    if not sheet: return []
     try:
+        sheet = get_db_sheet()
+        if not sheet: 
+            return st.session_state.get('cached_users', [])
+            
         rows = sheet.get_all_values()
         if len(rows) <= 1: return []
         users = []
@@ -197,11 +224,20 @@ def get_all_users_status():
                 "role": u_role,
                 "last_seen": u_last
             })
+        
+        st.session_state['cached_users'] = users
         return users
     except Exception as e:
-        return []
+        # API Kota Hatası verirse ekranı boşaltma, eski listeyi göster
+        return st.session_state.get('cached_users', [])
 
 def update_user_role(username, new_role):
+    # Arayüzün beklememesi ve hata anında sıfırlanmaması için önce Cache güncellenir
+    if 'cached_users' in st.session_state:
+        for u in st.session_state['cached_users']:
+            if u['username'] == username:
+                u['role'] = new_role
+                
     sheet = get_db_sheet()
     if not sheet: return False
     try:
