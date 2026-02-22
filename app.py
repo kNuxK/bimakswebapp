@@ -21,11 +21,15 @@ if 'permissions' not in st.session_state:
     st.session_state['permissions'] = ""
 
 def t(key): return config.LANGUAGES.get(st.session_state.get('lang', 'TR'), config.LANGUAGES['TR']).get(key, key)
-def _(tr, en, ru, ar):
+
+# V 121.0: 6 DİLLİ ÇEVİRİ MOTORU
+def _(tr, en, ru, ar, fr, es):
     l = st.session_state.get('lang', 'TR')
     if l == 'EN': return en
     if l == 'RU': return ru
     if l == 'AR': return ar
+    if l == 'FR': return fr
+    if l == 'ES': return es
     return tr
 
 # LOGIN EKRANI
@@ -118,7 +122,6 @@ with st.sidebar:
 
     st.markdown("<div style='margin-top: 50px;'></div>", unsafe_allow_html=True); st.markdown("---")
     
-    # V 120.0: Ayarlar Butonu ve Altında Açılan Admin Paneli
     is_settings_active = st.session_state.get('show_settings', False) and st.session_state.get('active_tab') != 'Admin Paneli'
     if st.button(t('settings'), use_container_width=True, type="primary" if is_settings_active else "secondary"): 
         st.session_state['show_settings'] = True
@@ -131,13 +134,16 @@ with st.sidebar:
             st.session_state['show_settings'] = False
             st.rerun()
 
+    # V 121.0: 6 DİL İÇİN SIDEBAR MENÜSÜ
     st.markdown("---"); st.markdown("### 🌐 Language")
-    r1c1, r1c2 = st.columns(2)
+    r1c1, r1c2, r1c3 = st.columns(3)
     if r1c1.button("TR", use_container_width=True): st.session_state['lang'] = 'TR'; st.rerun()
     if r1c2.button("EN", use_container_width=True): st.session_state['lang'] = 'EN'; st.rerun()
-    r2c1, r2c2 = st.columns(2)
-    if r2c1.button("RU", use_container_width=True): st.session_state['lang'] = 'RU'; st.rerun()
-    if r2c2.button("AR", use_container_width=True): st.session_state['lang'] = 'AR'; st.rerun()
+    if r1c3.button("RU", use_container_width=True): st.session_state['lang'] = 'RU'; st.rerun()
+    r2c1, r2c2, r2c3 = st.columns(3)
+    if r2c1.button("AR", use_container_width=True): st.session_state['lang'] = 'AR'; st.rerun()
+    if r2c2.button("FR", use_container_width=True): st.session_state['lang'] = 'FR'; st.rerun()
+    if r2c3.button("ES", use_container_width=True): st.session_state['lang'] = 'ES'; st.rerun()
     st.caption(st.session_state['settings_db'].get('app_footer'))
 
 # --- ANA EKRAN ---
@@ -145,7 +151,9 @@ with st.sidebar:
 # 1. BİMAKS TEKNİK
 if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session_state.get('show_settings'):
     st.header(t('btn_bimaks_tech'))
-    if not st.session_state['settings_db'].get("genai_key"): st.info(_("👋 API Anahtarı Gerekli. Lütfen Ayarlar'dan API girin.", "👋 API Key Required.", "👋 Требуется ключ API", "👋 مفتاح API مطلوب")); st.stop()
+    if not st.session_state['settings_db'].get("genai_key"): 
+        st.info(_("👋 API Anahtarı Gerekli. Lütfen Ayarlar'dan API girin.", "👋 API Key Required.", "👋 Требуется ключ API", "👋 مفتاح API مطلوب", "👋 Clé API requise.", "👋 Se requiere clave API."))
+        st.stop()
     
     nav_tabs = []
     tab_keys = []
@@ -154,7 +162,9 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     if "tech_roi" in perms or is_admin: nav_tabs.append(t('nav_roi')); tab_keys.append('ROI')
     if "tech_ocr" in perms or is_admin: nav_tabs.append(t('nav_ocr')); tab_keys.append('OCR')
     if "tech_reg" in perms or is_admin: nav_tabs.append(t('nav_reg')); tab_keys.append('REG')
-    if "tech_quo" in perms or is_admin: nav_tabs.append(_("Teklif Oluştur", "Quote Generator", "Генератор предложений", "مولد الاقتباس")); tab_keys.append('Teklif')
+    if "tech_quo" in perms or is_admin: 
+        nav_tabs.append(_("Teklif Oluştur", "Quote Generator", "Генератор предложений", "مولد الاقتباس", "Créer un devis", "Crear cotización"))
+        tab_keys.append('Teklif')
     if "tech_sds" in perms or is_admin: nav_tabs.append("SDS/TDS"); tab_keys.append('SDS')
     
     if not nav_tabs:
@@ -174,7 +184,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     # A. Sistem Analizi
     if st.session_state['bimaks_sub_tab'] == 'Analysis':
         st.subheader(t('solver_title'))
-        user_problem = st.text_area(_("Problem:", "Problem:", "Проблема:", "مشكلة:"), height=100, placeholder=t('solver_ph'))
+        user_problem = st.text_area(_("Problem:", "Problem:", "Проблема:", "مشكلة:", "Problème:", "Problema:"), height=100, placeholder=t('solver_ph'))
         st.info(t('lsi_info'))
         
         col_mk, col_sy = st.columns(2)
@@ -223,7 +233,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             MISSION: Provide a detailed technical solution, chemical recommendations, and operational adjustments.
             CRITICAL LANGUAGE RULE: TRANSLATE YOUR THOUGHTS AND WRITE YOUR ENTIRE RESPONSE STRICTLY, NATIVELY, AND FLUENTLY IN {lang_name.upper()}. DO NOT MIX LANGUAGES.
             """
-            with st.spinner(_("Analiz ediliyor...", "Analyzing...", "Анализируется...", "جارٍ التحليل...")):
+            with st.spinner(_("Analiz ediliyor...", "Analyzing...", "Анализируется...", "جارٍ التحليل...", "Analyse en cours...", "Analizando...")):
                 res = logic.get_gemini_response_from_manual(p_solver, st.session_state['settings_db']["genai_key"])
                 st.markdown(res)
 
@@ -255,7 +265,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             if res:
                 new_chem_cost = res['w_new'] * (dose / 1000) * price 
                 total_gain = res['w_money'] + res['e_save'] + (cost_c - new_chem_cost)
-                st.subheader(_("📊 Karşılaştırmalı Maliyet Analizi", "📊 Comparative Cost Analysis", "📊 Сравнительный анализ затрат", "📊 تحليل التكلفة المقارن"))
+                st.subheader(_("📊 Karşılaştırmalı Maliyet Analizi", "📊 Comparative Cost Analysis", "📊 Сравнительный анализ затрат", "📊 تحليل التكلفة المقارن", "📊 Analyse comparative des coûts", "📊 Análisis de costos comparativo"))
                 col_data = {
                     t('tbl_param'): [t('row_water'), t('row_energy'), t('row_chem'), t('row_total')],
                     t('tbl_curr'): [f"{res['w_curr']:.0f} m³", f"{cost_e:,.0f} €", f"{cost_c:,.0f} €", f"{(res['w_curr']*cost_w + cost_e + cost_c):,.0f} €"],
@@ -263,12 +273,12 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     t('tbl_save'): [f"✅ {res['w_save']:.0f} m³", f"✅ {res['e_save']:,.0f} €", f"{'✅' if cost_c > new_chem_cost else '❌'} {(cost_c - new_chem_cost):,.0f} €", f"🔥 {total_gain:,.0f} €"]
                 }
                 st.table(col_data)
-            else: st.error(_("Hesaplama hatası.", "Calculation error.", "Ошибка расчета.", "خطأ في الحساب."))
+            else: st.error(_("Hesaplama hatası.", "Calculation error.", "Ошибка расчета.", "خطأ في الحساب.", "Erreur de calcul.", "Error de cálculo."))
 
     # C. OCR
     elif st.session_state['bimaks_sub_tab'] == 'OCR':
         st.subheader(t('ocr_title')); st.info(t('ocr_desc'))
-        ocr_file = st.file_uploader(_("Rapor Fotoğrafı", "Report Photo", "Фото отчета", "صورة التقرير"), type=['jpg', 'png', 'jpeg'])
+        ocr_file = st.file_uploader(_("Rapor Fotoğrafı", "Report Photo", "Фото отчета", "صورة التقرير", "Photo du rapport", "Foto del informe"), type=['jpg', 'png', 'jpeg'])
         if ocr_file and st.button(t('ocr_btn')):
             logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
@@ -277,14 +287,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             MISSION: Read, analyze and interpret this water analysis report. Point out any critical out-of-spec values and suggest corrective actions.
             CRITICAL LANGUAGE RULE: TRANSLATE YOUR THOUGHTS AND WRITE YOUR ENTIRE RESPONSE STRICTLY AND NATIVELY IN {lang_name.upper()}.
             """
-            with st.spinner(_("Okunuyor...", "Reading...", "Чтение...", "قراءة...")):
+            with st.spinner(_("Okunuyor...", "Reading...", "Чтение...", "قراءة...", "Lecture en cours...", "Leyendo...")):
                 res = logic.analyze_image_with_gemini(ocr_file.getvalue(), ocr_prompt, st.session_state['settings_db']["genai_key"])
                 st.markdown(res)
 
     # D. Mevzuat
     elif st.session_state['bimaks_sub_tab'] == 'REG':
-        st.subheader(t('reg_title')); q_reg = st.text_input(_("Soru:", "Question:", "Вопрос:", "سؤال:"), placeholder=t('reg_ph'))
-        if st.button(_("Araştır", "Search", "Поиск", "بحث")):
+        st.subheader(t('reg_title')); q_reg = st.text_input(_("Soru:", "Question:", "Вопрос:", "سؤال:", "Question:", "Pregunta:"), placeholder=t('reg_ph'))
+        if st.button(_("Araştır", "Search", "Поиск", "بحث", "Rechercher", "Buscar")):
             logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             reg_prompt = f"ACT AS: Regulatory Expert. QUESTION: {q_reg}. CRITICAL LANGUAGE RULE: YOU MUST WRITE YOUR ENTIRE RESPONSE STRICTLY IN {lang_name.upper()}."
@@ -295,14 +305,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     elif st.session_state['bimaks_sub_tab'] == 'Teklif':
         st.subheader(t('quote_title'))
         
-        with st.expander(_("📄 Antetli Kağıt Ayarı", "📄 Letterhead Setup", "📄 Настройка бланка", "📄 إعداد الترويسة"), expanded=True):
+        with st.expander(_("📄 Antetli Kağıt Ayarı", "📄 Letterhead Setup", "📄 Настройка бланка", "📄 إعداد الترويسة", "📄 Config. En-tête", "📄 Config. Membrete"), expanded=True):
             default_antet = "antetlikagit.pdf"
             
-            ut = st.file_uploader(_("Yeni Antet Yükle:", "Upload New Letterhead:", "Загрузить новый бланк:", "تحميل ترويسة جديدة:"), type=['png', 'jpg', 'jpeg', 'pdf'], key="quote_antet")
+            ut = st.file_uploader(_("Yeni Antet Yükle:", "Upload New Letterhead:", "Загрузить новый бланк:", "تحميل ترويسة جديدة:", "Nouveau En-tête :", "Nuevo Membrete:"), type=['png', 'jpg', 'jpeg', 'pdf'], key="quote_antet")
             
             if ut: 
                 st.session_state['template_data'] = ut.getvalue()
-                st.success(_("✅ Yeni antet kullanılıyor!", "✅ New letterhead applied!", "✅ Используется новый бланк!", "✅ تم تطبيق ترويسة جديدة!"))
+                st.success(_("✅ Yeni antet kullanılıyor!", "✅ New letterhead applied!", "✅ Используется новый бланк!", "✅ تم تطبيق ترويسة جديدة!", "✅ Nouvel en-tête appliqué !", "✅ ¡Nuevo membrete aplicado!"))
             else:
                 if os.path.exists(default_antet):
                     with open(default_antet, "rb") as f: 
@@ -315,19 +325,19 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         c1, c2 = st.columns(2)
         qi, qs = c1.text_area(t('q_invoice_info'), height=100), c1.text_area(t('q_shipping_addr'), height=100)
         qp, qpy = c2.text_input(t('q_period'), "15"), c2.text_input(t('q_payment'), "Peşin / Cash")
-        qb, qc = c2.text_area(t('q_bank_lbl'), value=t('q_bank_def'), height=100), c2.selectbox(_("Birim", "Currency", "Валюта", "العملة"), ["₺","$","€"])
+        qb, qc = c2.text_area(t('q_bank_lbl'), value=t('q_bank_def'), height=100), c2.selectbox(_("Birim", "Currency", "Валюта", "العملة", "Devise", "Moneda"), ["₺","$","€"])
         
         st.divider()
         
         c_qn, c_qk, c_qs, c_qq, c_qu, c_qp = st.columns([3, 1.5, 1.5, 1, 1, 1.5])
         qn = c_qn.text_input(t('q_prod_name'))
-        qk = c_qk.text_input(_("Ambalaj", "Pkg", "Упак.", "تعبئة"))
+        qk = c_qk.text_input(_("Ambalaj", "Pkg", "Упак.", "تعبئة", "Emb.", "Paq."))
         qs = c_qs.selectbox(t('q_shipping_opt'), [t('q_inc'), t('q_exc')])
-        qq = c_qq.number_input(_("Adet", "Qty", "Кол.", "كمية"), 1, 10000, 1)
-        qu = c_qu.text_input(_("Birim", "Unit", "Ед.", "وحدة"), value="kg")
-        qp_val = c_qp.number_input(_("Fiyat", "Price", "Цена", "السعر"), 0.0, 1000000.0, 0.0)
+        qq = c_qq.number_input(_("Adet", "Qty", "Кол.", "كمية", "Qté", "Cant."), 1, 10000, 1)
+        qu = c_qu.text_input(_("Birim", "Unit", "Ед.", "وحدة", "Unité", "Unidad"), value="kg")
+        qp_val = c_qp.number_input(_("Fiyat", "Price", "Цена", "السعر", "Prix", "Precio"), 0.0, 1000000.0, 0.0)
         
-        if st.button(_("Ekle", "Add", "Добавить", "إضافة")): 
+        if st.button(_("Ekle", "Add", "Добавить", "إضافة", "Ajouter", "Añadir")): 
             new_item = {
                 "name": qn,
                 "pkg": qk,
@@ -341,7 +351,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         
         if st.session_state['quote_items']:
             st.markdown("---")
-            st.markdown(_("**📝 Eklenen Ürünler (Düzenleyebilirsiniz)**", "**📝 Added Items (Editable)**", "**📝 Добавленные товары (можно редактировать)**", "**📝 العناصر المضافة (قابلة للتعديل)**"))
+            st.markdown(_("**📝 Eklenen Ürünler (Düzenleyebilirsiniz)**", "**📝 Added Items (Editable)**", "**📝 Добавленные товары (можно редактировать)**", "**📝 العناصر المضافة (قابلة للتعديل)**", "**📝 Articles ajoutés (Modifiables)**", "**📝 Artículos agregados (Editables)**"))
             
             for i, it in enumerate(st.session_state['quote_items']):
                 c_ed1, c_ed2, c_ed3, c_ed4, c_ed5, c_ed6 = st.columns([3, 1.5, 1, 1, 1.5, 0.5])
@@ -361,13 +371,13 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             if st.button(t('q_create')):
                 logic.ping_online(st.session_state['current_user'])
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
-                st.download_button(_("İndir", "Download", "Скачать", "تحميل"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
+                st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
     # F. BAYİ SDS/TDS ÜRETİCİ
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and show_sds:
-        st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل"))
-        doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:"), ["SDS", "TDS"], horizontal=True)
-        st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية."))
+        st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
+        doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
+        st.info(_("Sisteme bir PDF yüklediğinizde sağ tarafta orijinal PDF'in canlı görüntüsü belirecektir. Sol taraftaki gelişmiş araçlarla yeni logonuzu, adresinizi ve gizleme maskelerini istediğiniz yere milimetrik olarak kaydırabilirsiniz.", "Live Preview and advanced positioning added.", "Предварительный просмотр.", "معاينة حية.", "Un aperçu en direct du PDF s'affichera à droite.", "Se mostrará una vista previa en vivo del PDF a la derecha."))
         
         st.markdown("""
             <style>
@@ -384,9 +394,9 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         c_p1, c_p2 = st.columns([1, 1])
         
         with c_p1:
-            sds_file = st.file_uploader(_(f"1. Orijinal {doc_type} (PDF)", f"1. Original {doc_type} (PDF)", f"1. Оригинальный {doc_type}", f"1. {doc_type} الأصلي"), type=['pdf'])
-            d_logo = st.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل"), type=['png', 'jpg', 'jpeg'])
-            d_addr = st.text_area(_("3. Bayi Adresi (Aşağıya yazılacak)", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل"), height=100)
+            sds_file = st.file_uploader(_(f"1. Orijinal {doc_type} (PDF)", f"1. Original {doc_type} (PDF)", f"1. Оригинальный {doc_type}", f"1. {doc_type} الأصلي", f"1. {doc_type} original (PDF)", f"1. {doc_type} original (PDF)"), type=['pdf'])
+            d_logo = st.file_uploader(_("2. Bayi Logosu (PNG/JPG)", "2. Dealer Logo", "2. Логотип дилера", "2. شعار الوكيل", "2. Logo du distributeur", "2. Logo del distribuidor"), type=['png', 'jpg', 'jpeg'])
+            d_addr = st.text_area(_("3. Bayi Adresi (Aşağıya yazılacak)", "3. Dealer Address", "3. Адрес дилера", "3. عنوان الوكيل", "3. Adresse du distributeur", "3. Dirección del distribuidor"), height=100)
             
             exact_replacements = []
             smart_replacements = []
@@ -498,7 +508,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 addr_y = c_a2.slider("Adres Y (Yukarı-Aşağı)", 500, 842, 790, key=f"{doc_type}_ay")
 
             st.markdown("---")
-            if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
+            if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF", f"✅ Générer {doc_type}", f"✅ Generar {doc_type}"), type="primary"):
                 logic.ping_online(st.session_state['current_user'])
                 if sds_file:
                     with st.spinner(f"{doc_type} Maskeleniyor ve Oluşturuluyor..."):
@@ -515,14 +525,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         )
                         if pdf_out:
                             st.success(f"İşlem Başarılı! {doc_type} bütün sayfalara uygulandı.")
-                            st.download_button("📥 İndir / Download", data=pdf_out, file_name=f"Bayi_{doc_type}.pdf", mime="application/pdf")
+                            st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf_out, file_name=f"Bayi_{doc_type}.pdf", mime="application/pdf")
                         else:
                             st.error("HATA: PDF işlenemedi. Orijinal belgede bir sorun olabilir.")
                 else:
                     st.warning(f"Lütfen orijinal {doc_type} dosyasını yükleyin.")
                     
         with c_p2:
-            st.markdown(_(f"**👀 Canlı Önizleme (Yüklediğiniz {doc_type})**", "**👀 Live Preview**", "**👀 Предварительный просмотр**", "**👀 معاينة حية**"))
+            st.markdown(_(f"**👀 Canlı Önizleme (Yüklediğiniz {doc_type})**", "**👀 Live Preview**", "**👀 Предварительный просмотр**", "**👀 معاينة حية**", f"**👀 Aperçu en direct ({doc_type})**", f"**👀 Vista previa en vivo ({doc_type})**"))
             
             preview_img = logic.generate_sds_preview(
                 sds_file.getvalue() if sds_file else None,
@@ -543,12 +553,12 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
         sel_p = st.selectbox(t('sys_select'), ui_personas, index=0, key="li_p")
         role_c = st.text_input(t('sys_manual'), key="li_m") if sel_p == t('sys_manual') else sel_p
         
-        m_topic = st.text_input(t('topic'), placeholder=_("Konu...", "Topic...", "Тема...", "الموضوع..."))
+        m_topic = st.text_input(t('topic'), placeholder=_("Konu...", "Topic...", "Тема...", "الموضوع...", "Sujet...", "Tema..."))
         t_aud = st.text_input(t('target_audience'), t('target_def'))
         t_plat = st.text_input(t('target_plat'), t('plat_def'))
         
-        p_ref = st.text_input(t('prod_ref'), placeholder=_("Örn: BİMAKS Atık Su Kimyasalları", "e.g., BIMAKS Waste Water Chemicals", "напр., Химикаты BIMAKS", "مثال: بيمكس للمواد الكيميائية"))
-        p_link = st.text_input(t('prod_link_lbl'), placeholder=_("Örn: https://www.bimaks...", "e.g., https://www.bimaks...", "напр., https://www.bimaks...", "مثال: https://www.bimaks...")) 
+        p_ref = st.text_input(t('prod_ref'), placeholder=_("Örn: BİMAKS Atık Su Kimyasalları", "e.g., BIMAKS Waste Water Chemicals", "напр., Химикаты BIMAKS", "مثال: بيمكس للمواد الكيميائية", "ex. Produits chimiques pour eaux usées", "ej. Productos químicos para aguas residuales"))
+        p_link = st.text_input(t('prod_link_lbl'), placeholder=_("Örn: https://www.bimaks...", "e.g., https://www.bimaks...", "напр., https://www.bimaks...", "مثال: https://www.bimaks...", "ex. https://www.bimaks...", "ej. https://www.bimaks...")) 
         
         c_lim = st.number_input(t('prompt_limit'), 500, 10000, 3000, 100)
         
@@ -558,7 +568,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
             
             prompt = logic.construct_prompt_text(role_c, m_topic, t_aud, t_plat, clean_prod, c_lim, st.session_state.get('lang', 'TR'), p_link)
             
-            with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...")):
+            with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...", "L'IA écrit...", "La IA está escribiendo...")):
                 res = logic.get_gemini_response_from_manual(prompt, st.session_state['settings_db']["genai_key"])
                 if "HATA" in res or "ERROR" in res: st.error(res)
                 else:
@@ -569,7 +579,9 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
                         w_en = f"⚠️ WARNING: Generated text ({len(cleaned_res)} chars) exceeded limit ({c_lim}). It was NOT cut, edit below."
                         w_ru = f"⚠️ ВНИМАНИЕ: Текст ({len(cleaned_res)} симв.) превысил лимит ({c_lim}). Он не был обрезан."
                         w_ar = f"⚠️ تحذير: النص ({len(cleaned_res)} حرف) تجاوز الحد ({c_lim}). لم يتم قصه."
-                        st.session_state['linkedin_warning'] = _(w_tr, w_en, w_ru, w_ar)
+                        w_fr = f"⚠️ AVERTISSEMENT : Le texte généré ({len(cleaned_res)} caractères) a dépassé la limite ({c_lim}). Il n'a PAS été coupé."
+                        w_es = f"⚠️ ADVERTENCIA: El texto generado ({len(cleaned_res)} caracteres) superó el límite ({c_lim}). NO fue cortado."
+                        st.session_state['linkedin_warning'] = _(w_tr, w_en, w_ru, w_ar, w_fr, w_es)
                     else:
                         st.session_state['linkedin_warning'] = ""
                         
@@ -590,7 +602,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
             st.caption(f"📊 {t('char_count')} {len(val)}") 
             
         with c2:
-            st.subheader(t('visual')); up = st.file_uploader(_("Medya", "Media", "Медиа", "وسائط"), type=['jpg','png','mp4','mov'], key="li_up")
+            st.subheader(t('visual')); up = st.file_uploader(_("Medya", "Media", "Медиа", "وسائط", "Médias", "Medios"), type=['jpg','png','mp4','mov'], key="li_up")
             if up:
                 if "image" in up.type: st.image(up, use_container_width=True)
                 else: st.video(up)
@@ -602,7 +614,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
                 else: st.error(r)
     
     with st.expander("📜 History"):
-        if not st.session_state['history_db']: st.caption(_("Kayıt yok.", "No records.", "Нет записей.", "لا توجد سجلات."))
+        if not st.session_state['history_db']: st.caption(_("Kayıt yok.", "No records.", "Нет записей.", "لا توجد سجلات.", "Aucun enregistrement.", "Sin registros."))
         else: [st.text(f"{h['date']} | {h['topic']} | {h['role']}") for h in st.session_state['history_db']]
 
 # 3. INSTAGRAM
@@ -612,13 +624,13 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
         ui_personas = logic.get_persona_list_for_ui()
         sel_p = st.selectbox(t('sys_select'), ui_personas, key="in_p")
         role_c = st.text_input(t('sys_manual'), key="in_m") if sel_p == t('sys_manual') else sel_p
-        m_topic = st.text_input(t('topic'), placeholder=_("Konuyu yazın...", "Write the topic...", "Напишите тему...", "اكتب الموضوع..."))
+        m_topic = st.text_input(t('topic'), placeholder=_("Konuyu yazın...", "Write the topic...", "Напишите тему...", "اكتب الموضوع...", "Écrivez le sujet...", "Escribe el tema..."))
         c_lim = st.number_input(t('prompt_limit'), 500, 2200, 2000, 100, key="in_l")
         
         if st.button(t('btn_create'), type="primary", key="in_btn"):
             logic.ping_online(st.session_state['current_user'])
             st.session_state['draft_prompt'] = logic.construct_prompt_text(role_c, m_topic, "Followers", "Instagram", None, c_lim, st.session_state['lang'])
-            with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...")):
+            with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...", "L'IA écrit...", "La IA está escribiendo...")):
                 res = logic.get_gemini_response_from_manual(st.session_state['draft_prompt'], st.session_state['settings_db']["genai_key"])
                 if "HATA" in res or "ERROR" in res: st.error(res)
                 else: 
@@ -628,7 +640,9 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
                         w_en = f"⚠️ WARNING: Text ({len(cleaned_res)} chars) exceeded limit."
                         w_ru = f"⚠️ ВНИМАНИЕ: Текст ({len(cleaned_res)} симв.) превысил лимит."
                         w_ar = f"⚠️ تحذير: النص ({len(cleaned_res)} حرف) تجاوز الحد."
-                        st.session_state['insta_warning'] = _(w_tr, w_en, w_ru, w_ar)
+                        w_fr = f"⚠️ AVERTISSEMENT : Le texte généré ({len(cleaned_res)} caractères) a dépassé la limite."
+                        w_es = f"⚠️ ADVERTENCIA: El texto generado ({len(cleaned_res)} caracteres) superó el límite."
+                        st.session_state['insta_warning'] = _(w_tr, w_en, w_ru, w_ar, w_fr, w_es)
                     else:
                         st.session_state['insta_warning'] = ""
                         
@@ -642,24 +656,24 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
         st.subheader(t('editor'))
         if st.session_state.get('insta_warning'):
             st.warning(st.session_state['insta_warning'])
-        st.text_area(_("İçerik:", "Caption:", "Подпись:", "التسمية التوضيحية:"), value=st.session_state.get('insta_editor', ''), height=300, key="insta_editor_area")
+        st.text_area(_("İçerik:", "Caption:", "Подпись:", "التسمية التوضيحية:", "Légende:", "Leyenda:"), value=st.session_state.get('insta_editor', ''), height=300, key="insta_editor_area")
             
     with col2:
-        st.subheader(t('visual')); uploaded_file = st.file_uploader(_("Resim Yükle", "Upload Image", "Загрузить изображение", "تحميل الصورة"), type=['jpg', 'png'])
+        st.subheader(t('visual')); uploaded_file = st.file_uploader(_("Resim Yükle", "Upload Image", "Загрузить изображение", "تحميل الصورة", "Télécharger l'image", "Subir imagen"), type=['jpg', 'png'])
         if uploaded_file: im = Image.open(uploaded_file).convert("RGB"); im = logic.resize_for_instagram(im); st.session_state['original_image'] = im
         if 'original_image' in st.session_state:
-            with st.expander(_("🏷️ Etiketle", "🏷️ Tagging", "🏷️ Теги", "🏷️ وسم"), expanded=True):
-                tag_color = st.color_picker(_("Etiket Rengi", "Tag Color", "Цвет тега", "لون العلامة"), "#FFFF00")
-                tag_u = st.text_input(_("Kullanıcı Adı", "Username", "Имя пользователя", "اسم المستخدم"))
-                t_x, t_y = st.slider(_("X Konumu", "X Pos", "Позиция X", "موضع X"), 0, 100, 50), st.slider(_("Y Konumu", "Y Pos", "Позиция Y", "موضع Y"), 0, 100, 50)
-                if st.button(_("Ekle", "Add", "Добавить", "إضافة")): st.session_state['insta_tags_list'].append({'u': tag_u, 'x': t_x/100, 'y': t_y/100, 'c': tag_color}); st.rerun()
+            with st.expander(_("🏷️ Etiketle", "🏷️ Tagging", "🏷️ Теги", "🏷️ وسم", "🏷️ Étiqueter", "🏷️ Etiquetar"), expanded=True):
+                tag_color = st.color_picker(_("Etiket Rengi", "Tag Color", "Цвет тега", "لون العلامة", "Couleur de l'étiquette", "Color de etiqueta"), "#FFFF00")
+                tag_u = st.text_input(_("Kullanıcı Adı", "Username", "Имя пользователя", "اسم المستخدم", "Nom d'utilisateur", "Nombre de usuario"))
+                t_x, t_y = st.slider(_("X Konumu", "X Pos", "Позиция X", "موضع X", "Pos X", "Pos X"), 0, 100, 50), st.slider(_("Y Konumu", "Y Pos", "Позиция Y", "موضع Y", "Pos Y", "Pos Y"), 0, 100, 50)
+                if st.button(_("Ekle", "Add", "Добавить", "إضافة", "Ajouter", "Añadir")): st.session_state['insta_tags_list'].append({'u': tag_u, 'x': t_x/100, 'y': t_y/100, 'c': tag_color}); st.rerun()
             preview_img = st.session_state['original_image'].copy(); draw = ImageDraw.Draw(preview_img); w, h = preview_img.size
             for t_tag in st.session_state['insta_tags_list']: draw.text((t_tag['x']*w, t_tag['y']*h), f"@{t_tag['u']}", fill=t_tag.get('c', '#FFFF00'))
             if tag_u: draw.text((t_x/100*w, t_y/100*h), f"@{tag_u}", fill=tag_color)
-            st.image(preview_img, caption=_("Önizleme (Canlı)", "Live Preview", "Предпросмотр", "معاينة حية"), use_container_width=True)
+            st.image(preview_img, caption=_("Önizleme (Canlı)", "Live Preview", "Предпросмотр", "معاينة حية", "Aperçu (en direct)", "Vista previa (en vivo)"), use_container_width=True)
             if st.button(t('publish_insta'), type="primary"): logic.ping_online(st.session_state['current_user']); st.warning("⚠️ Web API Simulasyon Modundadır.")
 
-# 4. ADMIN PANELİ (V 120.0 GÜNCELLENDİ)
+# 4. ADMIN PANELİ
 elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
     st.header("👑 Admin Yönetim Paneli")
     
@@ -697,7 +711,6 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
         if p_tech_sds: new_perms.append("tech_sds")
         
         role_defs[sel_role] = ",".join(new_perms)
-        # Cache'i güncelleyip API'yi yormadan işlemi tamamlar
         logic.update_role_definitions(role_defs["Admin"], role_defs["Bimaks Üye"], role_defs["Yeni Üye"])
         st.success("Yetkiler başarıyla güncellendi! Bu role sahip tüm kullanıcıların erişimleri anında değişti.")
         if st.session_state['role'] == sel_role:
@@ -763,14 +776,16 @@ elif st.session_state.get('show_settings'):
         if is_admin:
             st.subheader(t('set_role_mgmt'))
             np = st.text_input(t('set_add_role'))
-            if st.button(_("Ekle", "Add", "Добавить", "إضافة")): st.session_state['personas_db'].append({"TR": np, "EN": np, "RU": np, "AR": np}); st.rerun()
+            if st.button(_("Ekle", "Add", "Добавить", "إضافة", "Ajouter", "Añadir")): 
+                st.session_state['personas_db'].append({"TR": np, "EN": np, "RU": np, "AR": np, "FR": np, "ES": np}); st.rerun()
             dp = st.selectbox(t('set_del_role'), logic.get_persona_list_for_ui())
-            if st.button(_("Sil", "Delete", "Удалить", "حذف")): st.session_state['personas_db'] = [p for p in st.session_state['personas_db'] if p.get(st.session_state['lang']) != dp]; st.rerun()
+            if st.button(_("Sil", "Delete", "Удалить", "حذف", "Supprimer", "Eliminar")): 
+                st.session_state['personas_db'] = [p for p in st.session_state['personas_db'] if p.get(st.session_state['lang']) != dp]; st.rerun()
             
             st.markdown("---")
             st.subheader(t('set_logo'))
             ul = st.file_uploader(t('set_logo_btn'), type=['png', 'jpg', 'jpeg'])
-            if ul: st.session_state['logo_data'] = ul.getvalue(); st.success(_("Logo Güncellendi!", "Logo Updated!", "Логотип обновлен!", "تم تحديث الشعار!"))
+            if ul: st.session_state['logo_data'] = ul.getvalue(); st.success(_("Logo Güncellendi!", "Logo Updated!", "Логотип обновлен!", "تم تحديث الشعار!", "Logo mis à jour !", "¡Logo actualizado!"))
             
             st.markdown("---")
             st.subheader(t('set_theme'))
@@ -779,17 +794,17 @@ elif st.session_state.get('show_settings'):
             nbtn = st.color_picker(t('set_btn'), st.session_state['settings_db'].get("theme_btn"))
             
             st.markdown("---")
-            nt = st.text_input(_("Başlık", "Title", "Заголовок", "عنوان"), st.session_state['settings_db'].get("app_title"))
-            nf = st.text_input(_("Alt Bilgi", "Footer", "Нижний колонтитул", "تذييل"), st.session_state['settings_db'].get("app_footer"))
+            nt = st.text_input(_("Başlık", "Title", "Заголовок", "عنوان", "Titre", "Título"), st.session_state['settings_db'].get("app_title"))
+            nf = st.text_input(_("Alt Bilgi", "Footer", "Нижний колонтитул", "تذييل", "Pied de page", "Pie de página"), st.session_state['settings_db'].get("app_footer"))
             st.markdown(f"**{t('set_modules')}**")
-            se = st.checkbox(_("Sosyal Medya", "Social Media", "Соцсети", "وسائل التواصل الاجتماعي"), st.session_state['settings_db'].get("enable_social_media"))
+            se = st.checkbox(_("Sosyal Medya", "Social Media", "Соцсети", "وسائل التواصل الاجتماعي", "Médias sociaux", "Redes sociales"), st.session_state['settings_db'].get("enable_social_media"))
             li = st.checkbox(" > LinkedIn", st.session_state['settings_db'].get("enable_linkedin"))
             ins = st.checkbox(" > Instagram", st.session_state['settings_db'].get("enable_instagram"))
-            pe = st.checkbox(_("Problem Çözücü", "Problem Solver", "Решатель проблем", "حل المشكلات"), st.session_state['settings_db'].get("enable_problem_solver"))
+            pe = st.checkbox(_("Problem Çözücü", "Problem Solver", "Решатель проблем", "حل المشكلات", "Résolveur de problèmes", "Solucionador de problemas"), st.session_state['settings_db'].get("enable_problem_solver"))
             sds_cb = st.checkbox(" > Bayi SDS/TDS", st.session_state['settings_db'].get("enable_dealer_sds", False))
-            qe = st.checkbox(_("Teklif", "Quote", "Коммерческое предложение", "اقتباس"), st.session_state['settings_db'].get("enable_quote"))
+            qe = st.checkbox(_("Teklif", "Quote", "Коммерческое предложение", "اقتباس", "Devis", "Cotización"), st.session_state['settings_db'].get("enable_quote"))
             
-            if st.button(_("Tema Kaydet", "Save Theme", "Сохранить тему", "حفظ السمة")): 
+            if st.button(_("Tema Kaydet", "Save Theme", "Сохранить тему", "حفظ السمة", "Enregistrer le thème", "Guardar tema")): 
                 st.session_state['settings_db'].update({
                     "app_title": nt, "app_footer": nf, "enable_social_media": se, 
                     "enable_linkedin": li, "enable_instagram": ins, "enable_problem_solver": pe, 
@@ -800,8 +815,8 @@ elif st.session_state.get('show_settings'):
             st.info("Tema ve Sistem ayarları sadece Adminler içindir.")
                 
     with c2:
-        st.subheader(_("Kişisel API Ayarların", "Personal API Settings", "Ваши настройки API", "إعدادات API الشخصية"))
-        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД только для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط."))
+        st.subheader(_("Kişisel API Ayarların", "Personal API Settings", "Ваши настройки API", "إعدادات API الشخصية", "Paramètres d'API personnels", "Configuración personal de API"))
+        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД только для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط.", "Les clés saisies ici sont enregistrées en toute sécurité.", "Las claves ingresadas aquí se guardan de forma segura."))
         
         k1 = st.text_input("Gemini API", st.session_state['settings_db'].get("genai_key", ""), type="password")
         k2 = st.text_input("LinkedIn Token", st.session_state['settings_db'].get("linkedin_token", ""), type="password")
@@ -814,7 +829,7 @@ elif st.session_state.get('show_settings'):
             with st.spinner("Veritabanına kaydediliyor..."):
                 is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
                 if is_saved:
-                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!"))
+                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ в قاعدة البيانات!", "Enregistré dans la BD !", "¡Guardado en la BD!"))
                 else:
                     st.error("Veritabanına kaydedilirken bir hata oluştu.")
             time.sleep(1); st.rerun()
