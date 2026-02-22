@@ -565,7 +565,6 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
     
     y = start_y - 120; c.line(40, y+15, 560, y+15); c.setFont(f_reg, 9)
     
-    # V 121.0: 6 DİL İÇİN AMBALAJ ÇEVİRİSİ
     amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة", "FR":"Emballage", "ES":"Paquete"}.get(lang_code, "Ambalaj")
     
     c.drawString(40, y, t('q_prod_name')); c.drawString(220, y, amb_text); c.drawString(450, y, f"{t('q_price')} ({currency})")
@@ -637,6 +636,7 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
+# V 122.0 - SAĞA DOĞRU REDAKSİYON (KARŞISINDAKİNİ DEĞİŞTİRME) MOTORU
 def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes:
         return pdf_bytes
@@ -649,24 +649,21 @@ def replace_text_in_pdf_bytes(pdf_bytes, exact_replacements=None, smart_replacem
             except:
                 pass
                 
+            # 1. AKILLI SATIR DEĞİŞTİRİCİ (Sadece başlığın sağ tarafını siler, başlığı korur!)
             if smart_replacements:
-                blocks = page.get_text("dict")["blocks"]
-                for b in blocks:
-                    if b.get('type') == 0: 
-                        for l in b.get("lines", []):
-                            line_text = "".join([s["text"] for s in l.get("spans", [])])
-                            for prefix, new_text in smart_replacements:
-                                if prefix and new_text and str(prefix) in line_text:
-                                    bbox = fitz.Rect(l["bbox"])
-                                    page.add_redact_annot(bbox, fill=(1, 1, 1))
-                                    page.apply_redactions()
-                                    
-                                    if l.get("spans"):
-                                        font_sz = l["spans"][0]["size"] * 0.90
-                                    else:
-                                        font_sz = 9
-                                    page.insert_text((bbox.x0, bbox.y1 - (bbox.height * 0.2)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
+                for prefix, new_text in smart_replacements:
+                    if prefix and new_text and str(prefix).strip() != "":
+                        instances = page.search_for(str(prefix))
+                        for inst in instances:
+                            # Başlığın bittiği yerden (x1) sayfanın sonuna kadar olan kısmı siler
+                            clear_rect = fitz.Rect(inst.x1 + 1, inst.y0 - 3, page.rect.width - 10, inst.y1 + 3)
+                            page.add_redact_annot(clear_rect, fill=(1, 1, 1))
+                            page.apply_redactions()
+                            
+                            font_sz = inst.height * 0.85
+                            page.insert_text((inst.x1 + 4, inst.y1 - (inst.height * 0.15)), str(new_text), fontsize=font_sz, color=(0,0,0), fontname="helv")
 
+            # 2. TAM EŞLEŞMELİ DEĞİŞTİRİCİ (Dev Başlıklar ve Adresler için)
             if exact_replacements:
                 for old_text, new_text in exact_replacements:
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
