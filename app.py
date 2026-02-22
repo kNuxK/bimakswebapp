@@ -399,76 +399,64 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             
             if doc_type == "SDS":
                 # V 122.0 - SADECE YENİ DEĞERLERİN GİRİLDİĞİ 16 MADDELİK AKILLI SİSTEM
-                with st.expander("🧠 Akıllı Belge Düzenleyici (Otomatik Satır Bulucu)", expanded=True):
-                    st.caption("Sistem buradaki başlıkları otomatik bulur, karşısında ne yazarsa yazsın o satırı tamamen silip sizin yazdığınız yeni bilgiyi oraya ekler. Eski değeri bilmenize gerek yoktur!")
+                with st.expander("🧠 1. Otonom Satır Değiştiriciler (Sadece Yeni Değeri Girin)", expanded=True):
+                    st.caption("Sistem bu başlıkları PDF'te bulur ve başlığa dokunmadan sadece KARŞISINDAKİ (sağındaki) değeri silip sizin yazdığınızı ekler. Eski değeri bilmenize gerek yoktur.")
                     
-                    c_r1, c_r2 = st.columns(2)
+                    c_s1, c_s2 = st.columns(2)
                     
-                    with c_r1:
-                        st.markdown("**1. Ürün Adı**")
-                        new_prod = st.text_input("Yeni Ürün Adı", placeholder="Örn: ÜRÜN ADI: YENİ ÜRÜN", key="nw_p_prod")
-                        if new_prod: smart_replacements.append(("ÜRÜN ADI", new_prod))
+                    with c_s1:
+                        new_chem = st.text_input("Kimyasal Adı", placeholder="Örn: TEMİZLEYİCİ")
+                        new_sup = st.text_input("Tedarikçi Firma", placeholder="Örn: YENİ FİRMA LTD. ŞTİ.")
+                        new_tel = st.text_input("Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
+                        new_fax = st.text_input("Tedarikçi Fax", placeholder="Örn: 0 212 123 45 67")
+                        new_mail = st.text_input("Tedarikçi Email", placeholder="Örn: info@bayi.com")
+                        new_web = st.text_input("Tedarikçi Web Adresi", placeholder="Örn: www.bayi.com")
+                        new_cdate = st.text_input("Oluşturma Tarihi", placeholder="Örn: 15.06.2024")
+                    
+                    with c_s2:
+                        new_rdate = st.text_input("Revizyon Tarihi", placeholder="Örn: 20.08.2025")
+                        new_vers = st.text_input("Versiyon Numarası", placeholder="Örn: 01")
+                        new_contact = st.text_input("Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
+                        new_emer = st.text_input("Acil Durum Telefonu", placeholder="Örn: 112")
+                        new_gbf = st.text_input("GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
+                        new_cert_date = st.text_input("Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
+                        new_cert_no = st.text_input("Sertifika No", placeholder="Örn: YENİ-NO")
 
-                        st.markdown("**2. Oluşturma Tarihi**")
-                        new_cdate = st.text_input("Yeni Oluşturma Tarihi", placeholder="Örn: Oluşturma Tarihi: 15.06.2024", key="nw_p_cdate")
-                        if new_cdate: smart_replacements.append(("Oluşturma Tarihi", new_cdate))
+                    if new_chem: smart_replacements.append(("KİMYASAL ADI", new_chem))
+                    if new_sup: smart_replacements.append(("TEDARİKÇİ", new_sup))
+                    if new_tel: smart_replacements.append(("Tel:", new_tel))
+                    if new_fax: smart_replacements.append(("Fax:", new_fax))
+                    if new_mail: smart_replacements.append(("E-mail:", new_mail))
+                    if new_web: smart_replacements.append(("Web:", new_web))
+                    if new_cdate: smart_replacements.append(("Oluşturma Tarihi", new_cdate))
+                    if new_rdate: smart_replacements.append(("Revizyon Tarihi", new_rdate))
+                    if new_vers: smart_replacements.append(("Versiyon", new_vers))
+                    if new_contact: smart_replacements.append(("BAŞVURULACAK KİŞİ", new_contact))
+                    if new_emer: smart_replacements.append(("ACİL DURUM TELEFON", new_emer))
+                    if new_gbf: smart_replacements.append(("GBF Yetkili Kişi", new_gbf))
+                    if new_cert_date: smart_replacements.append(("Sertifika Geçerlilik Süresi", new_cert_date))
+                    if new_cert_no: smart_replacements.append(("Sertifika No", new_cert_no))
 
-                        st.markdown("**3. Revizyon Tarihi**")
-                        new_rdate = st.text_input("Yeni Revizyon Tarihi", placeholder="Örn: Revizyon Tarihi: 20.08.2025", key="nw_p_rdate")
-                        if new_rdate: smart_replacements.append(("Revizyon Tarihi", new_rdate))
-
-                        st.markdown("**4. Versiyon Numarası**")
-                        new_vers = st.text_input("Yeni Versiyon Numarası", placeholder="Örn: Versiyon: 01", key="nw_p_vers")
-                        if new_vers: smart_replacements.append(("Versiyon", new_vers))
-
-                        st.markdown("**5. Kimyasal Adı**")
-                        new_chem = st.text_input("Yeni Kimyasal Adı", placeholder="Örn: KİMYASAL ADI: TEMİZLEYİCİ", key="nw_p_chem")
-                        if new_chem: smart_replacements.append(("KİMYASAL ADI", new_chem))
-
-                        st.markdown("**6. Tedarikçi**")
-                        new_sup = st.text_input("Yeni Tedarikçi", placeholder="Örn: TEDARİKÇİ: YENİ FİRMA LTD. ŞTİ.", key="nw_p_sup")
-                        if new_sup: smart_replacements.append(("TEDARİKÇİ", new_sup))
-
-                        st.markdown("**7. Tedarikçi Adresi**")
-                        new_add = st.text_input("Yeni Adres", placeholder="Örn: Yeni Adres Mah. Sok. No:1", key="nw_p_add")
-                        if new_add: smart_replacements.append(("Fatih Sultan", new_add))
-
-                        st.markdown("**8. Tedarikçi Telefonu**")
-                        new_tel_sup = st.text_input("Yeni Tel", placeholder="Örn: Tel: 0 555 555 55 55", key="nw_p_tel_sup")
-                        if new_tel_sup: smart_replacements.append(("Tel:", new_tel_sup))
-
-                    with c_r2:
-                        st.markdown("**9. Tedarikçi Fax**")
-                        new_fax = st.text_input("Yeni Fax", placeholder="Örn: Fax: 0 212 123 45 67", key="nw_p_fax")
-                        if new_fax: smart_replacements.append(("Fax", new_fax))
-
-                        st.markdown("**10. Tedarikçi Email**")
-                        new_mail = st.text_input("Yeni E-mail", placeholder="Örn: E-mail: info@bayi.com", key="nw_p_mail")
-                        if new_mail: smart_replacements.append(("E-mail", new_mail))
-
-                        st.markdown("**11. Tedarikçi Web Adresi**")
-                        new_web = st.text_input("Yeni Web Sitesi", placeholder="Örn: Web: www.bayi.com", key="nw_p_web")
-                        if new_web: smart_replacements.append(("Web", new_web))
-
-                        st.markdown("**12. Acil Durum Telefonu**")
-                        new_last_tel = st.text_input("Yeni Acil Tel", placeholder="Örn: ACİL DURUM TELEFON NUMARALARI: 112", key="nw_p_ltel")
-                        if new_last_tel: smart_replacements.append(("ACİL DURUM TELEFON", new_last_tel))
-
-                        st.markdown("**13. GBF Yetkili Kişi (Son Sayfa)**")
-                        new_gbf = st.text_input("GBF Yetkilisi", placeholder="Örn: GBF Yetkili Kişi: YENİ İSİM", key="nw_p_gbf")
-                        if new_gbf: smart_replacements.append(("GBF Yetkili Kişi", new_gbf))
-
-                        st.markdown("**14. Başvurulacak Kişi (Tablo)**")
-                        new_contact = st.text_input("Yeni İletişim Kişisi", placeholder="Örn: BAŞVURULACAK KİŞİ: ALİ VELİ", key="nw_p_contact")
-                        if new_contact: smart_replacements.append(("BAŞVURULACAK KİŞİ", new_contact))
-
-                        st.markdown("**15. Sertifika Geçerlilik Süresi**")
-                        new_cert_date = st.text_input("Yeni Sertifika Tarihi", placeholder="Örn: Sertifika Geçerlilik Süresi: 01.01.2028", key="nw_p_cval")
-                        if new_cert_date: smart_replacements.append(("Sertifika Geçerlilik", new_cert_date))
-
-                        st.markdown("**16. Sertifika No**")
-                        new_cert_no = st.text_input("Yeni Sertifika No", placeholder="Örn: Sertifika No: YENİ-NO", key="nw_p_cno")
-                        if new_cert_no: smart_replacements.append(("Sertifika No", new_cert_no))
+                with st.expander("🎯 2. Tam Eşleşmeli Değiştiriciler (Ana Başlık ve Adres)", expanded=True):
+                    st.caption("PDF'in en üstündeki Ürün Başlığı ve 'Adres:' gibi bir öneki olmayan açık adres satırını değiştirmek için sistemin ESKİ değeri tam olarak bilmesi gerekir.")
+                    
+                    st.markdown("**Ürün Adı (En Üstteki Ana Başlık ve Tablo İçin)**")
+                    c_e1, c_e2 = st.columns(2)
+                    old_prod = c_e1.text_input("Eski Ürün Adı (Zorunlu)", value="MAKS 400PD")
+                    new_prod = c_e2.text_input("Yeni Ürün Adı", placeholder="Örn: YENİ ÜRÜN ADI")
+                    
+                    st.markdown("**Tedarikçi Adresi**")
+                    c_e3, c_e4 = st.columns(2)
+                    old_add = c_e3.text_input("Eski Adres (Zorunlu)", value="Fatih Sultan Mehmet Mahallesi Şiir Sokak. No: 10 İç Kapı No: 1 Ümraniye/İSTANBUL")
+                    new_add = c_e4.text_input("Yeni Adres", placeholder="Örn: Yeni Mah. Sok. No:1")
+                    
+                    if new_prod:
+                        exact_replacements.append((old_prod, new_prod))
+                        smart_replacements.append(("ÜRÜN ADI", new_prod))
+                    if new_add:
+                        exact_replacements.append((old_add, new_add))
+                        # Diğer PDF'teki boşluklu formatı da yakalaması için
+                        exact_replacements.append((old_add.replace("Ümraniye/İSTANBUL", "Ümraniye/ İSTANBUL"), new_add))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=False):
                 st.caption("Logonun ve Adresin yerini X (Sağ-Sol) ve Y (Yukarı-Aşağı) olarak ayarlayın.")
@@ -498,7 +486,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 logic.ping_online(st.session_state['current_user'])
                 if sds_file:
                     with st.spinner(f"{doc_type} Maskeleniyor ve Oluşturuluyor..."):
-                        # Adres kısmı artık manuel olarak girilmiyor, maskeleme motoruna None gönderiyoruz ki üstüne ekstra bir şey yazmasın.
+                        # Adres kısmı artık manuel olarak girilmiyor, maskeleme motoruna None gönderiyoruz.
                         pdf_out = logic.create_dealer_pdf(
                             sds_file.getvalue(), 
                             d_logo.getvalue() if d_logo else None, 
