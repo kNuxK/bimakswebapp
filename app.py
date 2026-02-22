@@ -104,11 +104,6 @@ with st.sidebar:
     elif os.path.exists("logo.jpg"): st.image("logo.jpg", use_container_width=True)
     st.markdown(f"<h1 style='text-align: center;'>{st.session_state['settings_db'].get('app_title')}</h1>", unsafe_allow_html=True)
     st.markdown("---")
-    
-    if is_admin:
-        if st.button("👑 Admin Paneli", use_container_width=True, type="primary" if st.session_state['active_tab'] == 'Admin Paneli' else "secondary"):
-            st.session_state['active_tab'] = 'Admin Paneli'; st.rerun()
-        st.markdown("---")
 
     if ("smy" in perms or is_admin) and st.session_state['settings_db'].get("enable_social_media"):
         is_soc = st.session_state['active_tab'] in [t('btn_social_main'), t('btn_linkedin'), t('btn_instagram')]
@@ -122,7 +117,19 @@ with st.sidebar:
         st.session_state['active_tab'] = t('btn_bimaks_tech'); st.rerun()
 
     st.markdown("<div style='margin-top: 50px;'></div>", unsafe_allow_html=True); st.markdown("---")
-    if st.button(t('settings'), use_container_width=True): st.session_state['show_settings'] = True; st.session_state['active_tab'] = None; st.rerun()
+    
+    # V 120.0: Ayarlar Butonu ve Altında Açılan Admin Paneli
+    is_settings_active = st.session_state.get('show_settings', False) and st.session_state.get('active_tab') != 'Admin Paneli'
+    if st.button(t('settings'), use_container_width=True, type="primary" if is_settings_active else "secondary"): 
+        st.session_state['show_settings'] = True
+        st.session_state['active_tab'] = None
+        st.rerun()
+
+    if (st.session_state.get('show_settings') or st.session_state.get('active_tab') == 'Admin Paneli') and is_admin:
+        if st.button("↳ 👑 Admin Paneli", use_container_width=True, type="primary" if st.session_state.get('active_tab') == 'Admin Paneli' else "secondary"):
+            st.session_state['active_tab'] = 'Admin Paneli'
+            st.session_state['show_settings'] = False
+            st.rerun()
 
     st.markdown("---"); st.markdown("### 🌐 Language")
     r1c1, r1c2 = st.columns(2)
@@ -140,7 +147,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     st.header(t('btn_bimaks_tech'))
     if not st.session_state['settings_db'].get("genai_key"): st.info(_("👋 API Anahtarı Gerekli. Lütfen Ayarlar'dan API girin.", "👋 API Key Required.", "👋 Требуется ключ API", "👋 مفتاح API مطلوب")); st.stop()
     
-    # DINAMIK ALT MENÜ (Yetkilere Göre)
     nav_tabs = []
     tab_keys = []
     
@@ -198,6 +204,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             sy_sio2 = st.text_input(t('sio2_opt'), key="sy_sio2")
 
         if st.button(t('btn_analyze'), type="primary"):
+            logic.ping_online(st.session_state['current_user'])
             lsi_val, rsi_val = logic.calculate_lsi(sy_ph, sy_tds, sy_temp, sy_ca, sy_alk)
             an_txt = f"""
             MAKEUP SUYU: pH:{mk_ph}, TDS:{mk_tds}, Ca:{mk_ca}, Alk:{mk_alk}, İletkenlik:{mk_cond}, Cl:{mk_cl}, SO4:{mk_so4}, Fe:{mk_fe}, SiO2:{mk_sio2}
@@ -243,6 +250,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         
         st.markdown("---")
         if st.button(t('roi_calc_btn'), type="primary"):
+            logic.ping_online(st.session_state['current_user'])
             res = logic.calculate_advanced_roi(bd, hours, coc_curr, coc_targ, cost_w, cost_e, scale, cost_c)
             if res:
                 new_chem_cost = res['w_new'] * (dose / 1000) * price 
@@ -262,6 +270,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         st.subheader(t('ocr_title')); st.info(t('ocr_desc'))
         ocr_file = st.file_uploader(_("Rapor Fotoğrafı", "Report Photo", "Фото отчета", "صورة التقرير"), type=['jpg', 'png', 'jpeg'])
         if ocr_file and st.button(t('ocr_btn')):
+            logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             ocr_prompt = f"""
             ACT AS: Senior Water Treatment Engineer.
@@ -276,6 +285,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     elif st.session_state['bimaks_sub_tab'] == 'REG':
         st.subheader(t('reg_title')); q_reg = st.text_input(_("Soru:", "Question:", "Вопрос:", "سؤال:"), placeholder=t('reg_ph'))
         if st.button(_("Araştır", "Search", "Поиск", "بحث")):
+            logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             reg_prompt = f"ACT AS: Regulatory Expert. QUESTION: {q_reg}. CRITICAL LANGUAGE RULE: YOU MUST WRITE YOUR ENTIRE RESPONSE STRICTLY IN {lang_name.upper()}."
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
@@ -349,6 +359,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             q_show_total = st.checkbox(t('q_show_total'), value=True)
             q_note = st.text_area(t('q_note_label'))
             if st.button(t('q_create')):
+                logic.ping_online(st.session_state['current_user'])
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
@@ -488,6 +499,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
 
             st.markdown("---")
             if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
+                logic.ping_online(st.session_state['current_user'])
                 if sds_file:
                     with st.spinner(f"{doc_type} Maskeleniyor ve Oluşturuluyor..."):
                         pdf_out = logic.create_dealer_pdf(
@@ -541,6 +553,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
         c_lim = st.number_input(t('prompt_limit'), 500, 10000, 3000, 100)
         
         if st.button(t('btn_create'), type="primary"):
+            logic.ping_online(st.session_state['current_user'])
             clean_prod = None if not p_ref or p_ref.strip() == "" else p_ref
             
             prompt = logic.construct_prompt_text(role_c, m_topic, t_aud, t_plat, clean_prod, c_lim, st.session_state.get('lang', 'TR'), p_link)
@@ -583,6 +596,7 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
                 else: st.video(up)
             st.markdown("---")
             if st.button(t('publish'), type="primary"): 
+                logic.ping_online(st.session_state['current_user'])
                 r = logic.post_to_linkedin_real(val, up.getvalue() if up else None, up.type if up else "", st.session_state['settings_db']["linkedin_token"])
                 if "✅" in r: logic.save_history_entry(m_topic, role_c); st.balloons(); st.success(r)
                 else: st.error(r)
@@ -602,6 +616,7 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
         c_lim = st.number_input(t('prompt_limit'), 500, 2200, 2000, 100, key="in_l")
         
         if st.button(t('btn_create'), type="primary", key="in_btn"):
+            logic.ping_online(st.session_state['current_user'])
             st.session_state['draft_prompt'] = logic.construct_prompt_text(role_c, m_topic, "Followers", "Instagram", None, c_lim, st.session_state['lang'])
             with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...")):
                 res = logic.get_gemini_response_from_manual(st.session_state['draft_prompt'], st.session_state['settings_db']["genai_key"])
@@ -642,9 +657,9 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
             for t_tag in st.session_state['insta_tags_list']: draw.text((t_tag['x']*w, t_tag['y']*h), f"@{t_tag['u']}", fill=t_tag.get('c', '#FFFF00'))
             if tag_u: draw.text((t_x/100*w, t_y/100*h), f"@{tag_u}", fill=tag_color)
             st.image(preview_img, caption=_("Önizleme (Canlı)", "Live Preview", "Предпросмотр", "معاينة حية"), use_container_width=True)
-            if st.button(t('publish_insta'), type="primary"): st.warning("⚠️ Web API Simulasyon Modundadır.")
+            if st.button(t('publish_insta'), type="primary"): logic.ping_online(st.session_state['current_user']); st.warning("⚠️ Web API Simulasyon Modundadır.")
 
-# 4. ADMIN PANELİ (YENİ V 119.0)
+# 4. ADMIN PANELİ (V 120.0 GÜNCELLENDİ)
 elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
     st.header("👑 Admin Yönetim Paneli")
     
@@ -682,6 +697,7 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
         if p_tech_sds: new_perms.append("tech_sds")
         
         role_defs[sel_role] = ",".join(new_perms)
+        # Cache'i güncelleyip API'yi yormadan işlemi tamamlar
         logic.update_role_definitions(role_defs["Admin"], role_defs["Bimaks Üye"], role_defs["Yeni Üye"])
         st.success("Yetkiler başarıyla güncellendi! Bu role sahip tüm kullanıcıların erişimleri anında değişti.")
         if st.session_state['role'] == sel_role:
@@ -722,7 +738,7 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
                     logic.delete_user(u['username'])
                     st.rerun()
     else:
-        st.info("Kayıtlı kullanıcı yok.")
+        st.info("Sistem bilgileri yükleniyor... Lütfen bekleyin veya sayfayı yenileyin.")
         
     st.markdown("---")
     with st.expander("➕ Yeni Kullanıcı Ekle"):
