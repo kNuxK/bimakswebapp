@@ -45,7 +45,7 @@ except ImportError:
     HAS_PYMUPDF = False
 
 # ==============================================================================
-# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 118.0 ROL MOTORU EKLENDİ)
+# 🧠 VERİTABANI VE KİMLİK DOĞRULAMA (V 118.1 KOTA KORUMASI EKLENDİ)
 # ==============================================================================
 
 def get_gsheets_client():
@@ -57,28 +57,41 @@ def get_gsheets_client():
         client = gspread.authorize(creds)
         return client
     except Exception as e:
-        st.error(f"Google API Bağlantı Hatası: Lütfen Secrets ayarlarını kontrol edin. Detay: {e}")
+        # Sessizce devam et, hata patlatma
         return None
 
 def get_db_sheet():
-    client = get_gsheets_client()
-    if not client: return None
-    sheet_url = st.secrets["gsheet_url"]
-    return client.open_by_url(sheet_url).sheet1
+    # V 118.1: API koptuğunda veya limit dolduğunda uygulamanın çökmesini engelleyen kalkan
+    try:
+        client = get_gsheets_client()
+        if not client: return None
+        sheet_url = st.secrets["gsheet_url"]
+        return client.open_by_url(sheet_url).sheet1
+    except Exception as e:
+        return None
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def ping_online(username):
-    sheet = get_db_sheet()
-    if not sheet: return
+    # V 118.1: Kullanıcının her tıklamasında API'yi boğmamak için 60 saniye bekleme süresi eklendi
     try:
+        now = time.time()
+        last_ping = st.session_state.get('last_ping_time', 0)
+        if now - last_ping < 60: 
+            return # 60 saniye geçmediyse Google'a istek atma, API'yi yorma
+            
+        sheet = get_db_sheet()
+        if not sheet: return
+        
         users = sheet.col_values(1)
         if username in users:
             row_idx = users.index(username) + 1
             now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
             sheet.update_cell(row_idx, 8, now_str)
-    except: pass 
+            st.session_state['last_ping_time'] = now
+    except: 
+        pass 
 
 def login_user(username, password):
     sheet = get_db_sheet()
@@ -91,11 +104,9 @@ def login_user(username, password):
             r_user = r[0] if len(r) > 0 else ""
             r_pass = r[1] if len(r) > 1 else ""
             if str(r_user) == username and str(r_pass) == hashed_pw:
-                # Sütun 7: Rol, Sütun 9: Özel İzinler
                 r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin" 
                 r_perms = r[8] if len(r) > 8 else ""
                 
-                # Eski hesapların bozulmaması için otomatik Admin yetkisi
                 if r_role.lower() == "admin" and not r_perms:
                     r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
                 
@@ -128,7 +139,6 @@ def register_user(username, password, role="Yeni Üye", perms=""):
         
         hashed_pw = hash_password(password)
         now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-        # Yeni üye varsayılan olarak yetkisiz doğar
         new_row = [username, hashed_pw, "", "", "", "", role, now_str, perms]
         sheet.append_row(new_row)
         return True, "Kayıt başarılı!"
