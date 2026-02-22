@@ -370,7 +370,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 124.2 - JİLET HİZALAMA VE TDS LAZER TARAMA)
+    # F. BAYİ SDS/TDS ÜRETİCİ (V 125.0 - ACİL TELEFON EKLENDİ, 16 MADDE)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -398,7 +398,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             exact_replacements = []
             
             if doc_type == "SDS":
-                # V 124.2 - SDS İÇİN 14 MADDELİ JİLET EDİTÖR
+                # V 125.0 - ACİL TELEFON 16 MADDELİ JİLET EDİTÖR
                 with st.expander("🧠 Akıllı Belge Düzenleyici (SDS Otonom)", expanded=True):
                     st.caption("Sadece yeni değerleri girin. Sistem eski yazıları bulup hizalarını ve arka plan çizgilerini hiç bozmadan milimetrik olarak yenisiyle değiştirir. Eski değeri bilmenize gerek yoktur!")
                     
@@ -412,16 +412,17 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_chem = st.text_input("5. Kimyasal Adı", placeholder="Örn: TEMİZLEYİCİ")
                         new_sup = st.text_input("6. Tedarikçi Firma", placeholder="Örn: YENİ FİRMA LTD. ŞTİ.")
                         new_add = st.text_area("7. Tedarikçi Adresi", placeholder="Örn: Yeni Mah. Sokak No:1\nİlçe / Şehir", height=68)
+                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                     
                     with c_s2:
-                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                         new_fax = st.text_input("9. Tedarikçi Fax", placeholder="Örn: 0 212 123 45 67")
                         new_mail = st.text_input("10. Tedarikçi Email", placeholder="Örn: info@bayi.com")
                         new_web = st.text_input("11. Tedarikçi Web Adresi", placeholder="Örn: www.bayi.com")
-                        new_contact = st.text_input("12. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
-                        new_gbf = st.text_input("13. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
-                        new_cert_date = st.text_input("14. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
-                        new_cert_no = st.text_input("15. Sertifika No", placeholder="Örn: YENİ-NO")
+                        new_emer = st.text_input("12. Acil Durum Telefonu", placeholder="Örn: 112")
+                        new_contact = st.text_input("13. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
+                        new_gbf = st.text_input("14. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
+                        new_cert_date = st.text_input("15. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
+                        new_cert_no = st.text_input("16. Sertifika No", placeholder="Örn: YENİ-NO")
 
                     auto_data = {
                         "ÜRÜN ADI": ("", new_prod),
@@ -435,6 +436,8 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         "Fax:": ("", new_fax),
                         "E-mail:": ("", new_mail),
                         "Web:": ("", new_web),
+                        "ACİL DURUM TELEFONU": ("", new_emer),
+                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_emer),
                         "BAŞVURULACAK KİŞİ": ("", new_contact),
                         "GBF Yetkili Kişi": ("", new_gbf),
                         "Sertifika Geçerlilik Süresi": ("", new_cert_date),
@@ -442,7 +445,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                     }
 
             elif doc_type == "TDS":
-                # V 124.2 - TDS İÇİN LAZER TARAMA MOTORU
                 with st.expander("🧠 TDS Akıllı Belge Düzenleyici (Lazer Tarama)", expanded=True):
                     st.caption("TDS belgelerinde 'Ürün Adı:' gibi sabit başlıklar olmadığından, değiştirmek istediğiniz eski kelimeleri tam olarak girmeniz gerekir. Sistem bu kelimeleri bulup TDS'in her yerinde yenisiyle değiştirecektir.")
                     
