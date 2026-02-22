@@ -71,7 +71,7 @@ if not st.session_state['logged_in']:
                     st.warning("Kullanıcı adı ve şifre en az 3 karakter olmalıdır.")
                 else:
                     with st.spinner("Kayıt yapılıyor..."):
-                        success, msg = logic.register_user(reg_user, reg_pass, "Yeni Üye", "")
+                        success, msg = logic.register_user(reg_user, reg_pass, "Yeni Üye")
                         if success: st.success(msg)
                         else: st.error(msg)
     st.stop()
@@ -198,7 +198,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             sy_sio2 = st.text_input(t('sio2_opt'), key="sy_sio2")
 
         if st.button(t('btn_analyze'), type="primary"):
-            logic.ping_online(st.session_state['current_user'])
             lsi_val, rsi_val = logic.calculate_lsi(sy_ph, sy_tds, sy_temp, sy_ca, sy_alk)
             an_txt = f"""
             MAKEUP SUYU: pH:{mk_ph}, TDS:{mk_tds}, Ca:{mk_ca}, Alk:{mk_alk}, İletkenlik:{mk_cond}, Cl:{mk_cl}, SO4:{mk_so4}, Fe:{mk_fe}, SiO2:{mk_sio2}
@@ -244,7 +243,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         
         st.markdown("---")
         if st.button(t('roi_calc_btn'), type="primary"):
-            logic.ping_online(st.session_state['current_user'])
             res = logic.calculate_advanced_roi(bd, hours, coc_curr, coc_targ, cost_w, cost_e, scale, cost_c)
             if res:
                 new_chem_cost = res['w_new'] * (dose / 1000) * price 
@@ -264,7 +262,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         st.subheader(t('ocr_title')); st.info(t('ocr_desc'))
         ocr_file = st.file_uploader(_("Rapor Fotoğrafı", "Report Photo", "Фото отчета", "صورة التقرير"), type=['jpg', 'png', 'jpeg'])
         if ocr_file and st.button(t('ocr_btn')):
-            logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             ocr_prompt = f"""
             ACT AS: Senior Water Treatment Engineer.
@@ -279,13 +276,12 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
     elif st.session_state['bimaks_sub_tab'] == 'REG':
         st.subheader(t('reg_title')); q_reg = st.text_input(_("Soru:", "Question:", "Вопрос:", "سؤال:"), placeholder=t('reg_ph'))
         if st.button(_("Araştır", "Search", "Поиск", "بحث")):
-            logic.ping_online(st.session_state['current_user'])
             lang_name = config.LANGUAGES.get(st.session_state['lang'], config.LANGUAGES['TR'])['name']
             reg_prompt = f"ACT AS: Regulatory Expert. QUESTION: {q_reg}. CRITICAL LANGUAGE RULE: YOU MUST WRITE YOUR ENTIRE RESPONSE STRICTLY IN {lang_name.upper()}."
             res = logic.get_gemini_response_from_manual(reg_prompt, st.session_state['settings_db']["genai_key"])
             st.markdown(res)
             
-    # E. TEKLİF OLUŞTUR (V 118.0 - BURAYA TAŞINDI)
+    # E. TEKLİF OLUŞTUR
     elif st.session_state['bimaks_sub_tab'] == 'Teklif':
         st.subheader(t('quote_title'))
         
@@ -353,7 +349,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             q_show_total = st.checkbox(t('q_show_total'), value=True)
             q_note = st.text_area(t('q_note_label'))
             if st.button(t('q_create')):
-                logic.ping_online(st.session_state['current_user'])
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
@@ -493,7 +488,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
 
             st.markdown("---")
             if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF"), type="primary"):
-                logic.ping_online(st.session_state['current_user'])
                 if sds_file:
                     with st.spinner(f"{doc_type} Maskeleniyor ve Oluşturuluyor..."):
                         pdf_out = logic.create_dealer_pdf(
@@ -547,7 +541,6 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
         c_lim = st.number_input(t('prompt_limit'), 500, 10000, 3000, 100)
         
         if st.button(t('btn_create'), type="primary"):
-            logic.ping_online(st.session_state['current_user'])
             clean_prod = None if not p_ref or p_ref.strip() == "" else p_ref
             
             prompt = logic.construct_prompt_text(role_c, m_topic, t_aud, t_plat, clean_prod, c_lim, st.session_state.get('lang', 'TR'), p_link)
@@ -590,7 +583,6 @@ elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_
                 else: st.video(up)
             st.markdown("---")
             if st.button(t('publish'), type="primary"): 
-                logic.ping_online(st.session_state['current_user'])
                 r = logic.post_to_linkedin_real(val, up.getvalue() if up else None, up.type if up else "", st.session_state['settings_db']["linkedin_token"])
                 if "✅" in r: logic.save_history_entry(m_topic, role_c); st.balloons(); st.success(r)
                 else: st.error(r)
@@ -610,7 +602,6 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
         c_lim = st.number_input(t('prompt_limit'), 500, 2200, 2000, 100, key="in_l")
         
         if st.button(t('btn_create'), type="primary", key="in_btn"):
-            logic.ping_online(st.session_state['current_user'])
             st.session_state['draft_prompt'] = logic.construct_prompt_text(role_c, m_topic, "Followers", "Instagram", None, c_lim, st.session_state['lang'])
             with st.spinner(_("AI Yazıyor...", "AI is writing...", "ИИ пишет...", "الذكاء الاصطناعي يكتب...")):
                 res = logic.get_gemini_response_from_manual(st.session_state['draft_prompt'], st.session_state['settings_db']["genai_key"])
@@ -651,72 +642,85 @@ elif st.session_state.get('active_tab') == t('btn_instagram') and not st.session
             for t_tag in st.session_state['insta_tags_list']: draw.text((t_tag['x']*w, t_tag['y']*h), f"@{t_tag['u']}", fill=t_tag.get('c', '#FFFF00'))
             if tag_u: draw.text((t_x/100*w, t_y/100*h), f"@{tag_u}", fill=tag_color)
             st.image(preview_img, caption=_("Önizleme (Canlı)", "Live Preview", "Предпросмотр", "معاينة حية"), use_container_width=True)
-            if st.button(t('publish_insta'), type="primary"): logic.ping_online(st.session_state['current_user']); st.warning("⚠️ Web API Simulasyon Modundadır.")
+            if st.button(t('publish_insta'), type="primary"): st.warning("⚠️ Web API Simulasyon Modundadır.")
 
-# 4. ADMIN PANELİ (YENİ V 118.0)
+# 4. ADMIN PANELİ (YENİ V 119.0)
 elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
     st.header("👑 Admin Yönetim Paneli")
     
-    st.subheader(_("👥 Kullanıcı İzinleri ve Online Takip", "👥 User Management", "👥 Управление пользователями", "👥 إدارة المستخدمين"))
+    st.subheader("🔒 Rol ve Yetki Yönetimi")
+    role_defs = logic.get_role_definitions()
     
+    sel_role = st.selectbox("Yetkilerini Düzenle:", ["Bimaks Üye", "Yeni Üye", "Admin"])
+    curr_perms = role_defs.get(sel_role, "")
+    
+    st.markdown(f"**{sel_role}** rolü için erişim izinleri:")
+    c1, c2 = st.columns(2)
+    p_smy = c1.checkbox("Sosyal Medya Yönetimi (Ana Menü)", value="smy" in curr_perms)
+    p_smy_li = c1.checkbox("↳ LinkedIn", value="smy_li" in curr_perms)
+    p_smy_in = c1.checkbox("↳ Instagram", value="smy_in" in curr_perms)
+    
+    p_tech = c2.checkbox("BİMAKS TEKNİK (Ana Menü)", value="tech" in curr_perms)
+    p_tech_an = c2.checkbox("↳ Sistem Analizi", value="tech_an" in curr_perms)
+    p_tech_roi = c2.checkbox("↳ ROI", value="tech_roi" in curr_perms)
+    p_tech_ocr = c2.checkbox("↳ OCR Analiz", value="tech_ocr" in curr_perms)
+    p_tech_reg = c2.checkbox("↳ Global Mevzuat", value="tech_reg" in curr_perms)
+    p_tech_quo = c2.checkbox("↳ Teklif Oluştur", value="tech_quo" in curr_perms)
+    p_tech_sds = c2.checkbox("↳ SDS/TDS", value="tech_sds" in curr_perms)
+    
+    if st.button(f"💾 {sel_role} Yetkilerini Kaydet", type="primary"):
+        new_perms = []
+        if p_smy: new_perms.append("smy")
+        if p_smy_li: new_perms.append("smy_li")
+        if p_smy_in: new_perms.append("smy_in")
+        if p_tech: new_perms.append("tech")
+        if p_tech_an: new_perms.append("tech_an")
+        if p_tech_roi: new_perms.append("tech_roi")
+        if p_tech_ocr: new_perms.append("tech_ocr")
+        if p_tech_reg: new_perms.append("tech_reg")
+        if p_tech_quo: new_perms.append("tech_quo")
+        if p_tech_sds: new_perms.append("tech_sds")
+        
+        role_defs[sel_role] = ",".join(new_perms)
+        logic.update_role_definitions(role_defs["Admin"], role_defs["Bimaks Üye"], role_defs["Yeni Üye"])
+        st.success("Yetkiler başarıyla güncellendi! Bu role sahip tüm kullanıcıların erişimleri anında değişti.")
+        if st.session_state['role'] == sel_role:
+            st.session_state['permissions'] = role_defs[sel_role]
+        time.sleep(1)
+        st.rerun()
+
+    st.markdown("---")
+    st.subheader("👥 Kullanıcı Listesi")
     users_data = logic.get_all_users_status()
     if users_data:
-        online_count = sum(1 for u in users_data if 'Online' in u['status'])
-        st.info(f"📊 **Sistem İstatistiği:** Toplam {len(users_data)} kullanıcı | 🟢 {online_count} Çevrimiçi")
+        c_h1, c_h2, c_h3, c_h4 = st.columns([3, 3, 3, 2])
+        c_h1.markdown("**Kullanıcı**")
+        c_h2.markdown("**Son Giriş**")
+        c_h3.markdown("**Rol**")
+        c_h4.markdown("**İşlem**")
+        st.markdown("---")
         
         for u in users_data:
-            with st.expander(f"👤 {u['username']} - Yetki: {u['role']} - {u['status']} ({u['last_seen']})"):
-                curr_role = str(u['role']).lower()
-                curr_perms = str(u['permissions'])
-                
-                new_role = st.selectbox("Kullanıcı Rolü", ["Yeni Üye", "Bimaks Üye", "Admin"], index=["yeni üye", "bimaks üye", "admin"].index(curr_role if curr_role in ["yeni üye", "bimaks üye", "admin"] else "yeni üye"), key=f"role_{u['username']}")
-                
-                st.write("Modül Erişim İzinleri:")
-                c1, c2 = st.columns(2)
-                p_smy = c1.checkbox("Sosyal Medya Yönetimi (Ana Menü)", value="smy" in curr_perms, key=f"p_smy_{u['username']}")
-                p_smy_li = c1.checkbox("↳ LinkedIn", value="smy_li" in curr_perms, key=f"p_smy_li_{u['username']}")
-                p_smy_in = c1.checkbox("↳ Instagram", value="smy_in" in curr_perms, key=f"p_smy_in_{u['username']}")
-                
-                p_tech = c2.checkbox("BİMAKS TEKNİK (Ana Menü)", value="tech" in curr_perms, key=f"p_tech_{u['username']}")
-                p_tech_an = c2.checkbox("↳ Sistem Analizi", value="tech_an" in curr_perms, key=f"p_tech_an_{u['username']}")
-                p_tech_roi = c2.checkbox("↳ ROI", value="tech_roi" in curr_perms, key=f"p_tech_roi_{u['username']}")
-                p_tech_ocr = c2.checkbox("↳ OCR Analiz", value="tech_ocr" in curr_perms, key=f"p_tech_ocr_{u['username']}")
-                p_tech_reg = c2.checkbox("↳ Global Mevzuat", value="tech_reg" in curr_perms, key=f"p_tech_reg_{u['username']}")
-                p_tech_quo = c2.checkbox("↳ Teklif Oluştur", value="tech_quo" in curr_perms, key=f"p_tech_quo_{u['username']}")
-                p_tech_sds = c2.checkbox("↳ SDS/TDS", value="tech_sds" in curr_perms, key=f"p_tech_sds_{u['username']}")
-                
-                cdel, csave = st.columns([8, 2])
-                if cdel.button("🗑️ Kullanıcıyı Sil", key=f"del_{u['username']}"):
-                    if u['username'] == st.session_state['current_user']:
-                        st.error("Kendi hesabınızı silemezsiniz!")
-                    else:
-                        with st.spinner("Siliniyor..."):
-                            s, m = logic.delete_user(u['username'])
-                            if s: st.success(m); time.sleep(1); st.rerun()
-                            else: st.error(m)
-                
-                if csave.button("Kaydet", key=f"save_{u['username']}", type="primary", use_container_width=True):
-                    # Seçilen izinleri topla
-                    selected_perms = []
-                    if p_smy: selected_perms.append("smy")
-                    if p_smy_li: selected_perms.append("smy_li")
-                    if p_smy_in: selected_perms.append("smy_in")
-                    if p_tech: selected_perms.append("tech")
-                    if p_tech_an: selected_perms.append("tech_an")
-                    if p_tech_roi: selected_perms.append("tech_roi")
-                    if p_tech_ocr: selected_perms.append("tech_ocr")
-                    if p_tech_reg: selected_perms.append("tech_reg")
-                    if p_tech_quo: selected_perms.append("tech_quo")
-                    if p_tech_sds: selected_perms.append("tech_sds")
+            cu1, cu2, cu3, cu4, cu5 = st.columns([3, 3, 2, 1, 1])
+            cu1.code(u['username'])
+            cu2.caption(u['last_seen'])
+            
+            role_options = ["Yeni Üye", "Bimaks Üye", "Admin"]
+            idx = role_options.index(u['role']) if u['role'] in role_options else 0
+            selected_r = cu3.selectbox("Rol", role_options, index=idx, key=f"sel_r_{u['username']}", label_visibility="collapsed")
+            
+            if cu4.button("💾", key=f"sv_{u['username']}", help="Rolü Kaydet"):
+                with st.spinner("..."):
+                    if logic.update_user_role(u['username'], selected_r):
+                        st.success("✔")
+                    else: st.error("X")
                     
-                    perms_str = ",".join(selected_perms)
-                    with st.spinner("Yetkiler güncelleniyor..."):
-                        if logic.update_user_role_and_perms(u['username'], new_role, perms_str):
-                            st.success("Kaydedildi!")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("Kayıt sırasında hata oluştu.")
+            if cu5.button("🗑️", key=f"dl_{u['username']}", help="Kullanıcıyı Sil"):
+                if u['username'] == st.session_state['current_user']:
+                    st.error("!")
+                else:
+                    logic.delete_user(u['username'])
+                    st.rerun()
     else:
         st.info("Kayıtlı kullanıcı yok.")
         
@@ -730,12 +734,7 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
                 st.warning("Kullanıcı adı ve şifre en az 3 karakter olmalı.")
             else:
                 with st.spinner("Ekleniyor..."):
-                    # Varsayılan yetkiler (Şablon)
-                    def_perms = ""
-                    if n_r == "Bimaks Üye": def_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
-                    if n_r == "Admin": def_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
-                    
-                    s, m = logic.register_user(n_u, n_p, n_r, def_perms)
+                    s, m = logic.register_user(n_u, n_p, n_r)
                     if s: st.success(f"'{n_u}' başarıyla oluşturuldu!"); time.sleep(1); st.rerun()
                     else: st.error(m)
 
@@ -799,7 +798,7 @@ elif st.session_state.get('show_settings'):
             with st.spinner("Veritabanına kaydediliyor..."):
                 is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
                 if is_saved:
-                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ в قاعدة البيانات!"))
+                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!"))
                 else:
                     st.error("Veritabanına kaydedilirken bir hata oluştu.")
             time.sleep(1); st.rerun()
