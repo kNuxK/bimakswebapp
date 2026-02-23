@@ -370,7 +370,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 127.1 - TDS AKILLI MERKEZLEME EKLENDİ)
+    # F. BAYİ SDS/TDS ÜRETİCİ (V 128.0)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -469,14 +469,15 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_tds_sup = st.text_input("Yeni Tedarikçi", placeholder="Örn: YENİ FİRMA")
                         new_tds_phone = st.text_input("Yeni Telefon", placeholder="Örn: 0 555 555 55 55")
                         
-                    # V 127.1 - Sadece En Baştakileri Merkezler, Gövdedekiler orijinal hizasında kalır!
+                    new_tds_add = st.text_area("Tedarikçi Adresi (Tüm Sayfaların Altına)", placeholder="Örn: Yeni Mah. Sokak No:1\nİlçe / Şehir", height=68)
+                        
                     if new_tds_prod: exact_replacements.append((old_tds_prod, new_tds_prod, True, True))
                     if new_tds_type: exact_replacements.append((old_tds_type, new_tds_type, True, True))
                     if new_tds_sup: exact_replacements.append((old_tds_sup, new_tds_sup, True, False))
                     if new_tds_phone: exact_replacements.append((old_tds_phone, new_tds_phone, True, False))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=False):
-                st.caption("Logonun ve İsteğe Bağlı Beyaz Maskelerin yerini X ve Y olarak ayarlayın.")
+                st.caption("Logonun, Adresin ve İsteğe Bağlı Beyaz Maskelerin yerini X ve Y olarak ayarlayın.")
                 
                 st.markdown("**1. Üst Beyaz Maske (Eski Logoyu Gizler)**")
                 ct1, ct2, ct3, ct4 = st.columns(4)
@@ -498,7 +499,21 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 logo_y = c_l2.slider("Logo Y (Yukarı-Aşağı)", 0, 300, 8, key=f"{doc_type}_ly")
                 logo_w = c_l3.slider("Logo Büyüklüğü", 50, 400, 174, key=f"{doc_type}_lw")
 
+                st.markdown("**4. Alt Bilgi / Adres Konumu (Tüm Sayfalar İçin)**")
+                c_a1, c_a2 = st.columns(2)
+                addr_x = c_a1.slider("Adres X (Sağ-Sol)", 0, 500, 80, key=f"{doc_type}_ax")
+                addr_y = c_a2.slider("Adres Y (Yukarı-Aşağı)", 500, 842, 800, key=f"{doc_type}_ay")
+
             st.markdown("---")
+            
+            current_addr = None
+            if doc_type == "SDS":
+                try: current_addr = new_add
+                except: current_addr = None
+            else:
+                try: current_addr = new_tds_add
+                except: current_addr = None
+                
             if st.button(_(f"✅ Onayla ve {doc_type} Oluştur", "Generate PDF", "Создать PDF", "إنشاء PDF", f"✅ Générer {doc_type}", f"✅ Generar {doc_type}"), type="primary"):
                 logic.ping_online(st.session_state['current_user'])
                 if sds_file:
@@ -506,10 +521,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         pdf_out = logic.create_dealer_pdf(
                             sds_file.getvalue(), 
                             d_logo.getvalue() if d_logo else None, 
-                            None, 
+                            current_addr, 
                             top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                             bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                            logo_x, logo_y, logo_w, 0, 0, 
+                            logo_x, logo_y, logo_w, addr_x, addr_y, 
                             st.session_state['lang'],
                             auto_data,
                             exact_replacements
@@ -528,10 +543,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             preview_img = logic.generate_sds_preview(
                 sds_file.getvalue() if sds_file else None,
                 d_logo.getvalue() if d_logo else None, 
-                None, 
+                current_addr, 
                 top_mask_x, top_mask_y, top_mask_w, top_mask_h, 
                 bot_mask_x, bot_mask_y, bot_mask_w, bot_mask_h, 
-                logo_x, logo_y, logo_w, 0, 0,
+                logo_x, logo_y, logo_w, addr_x, addr_y,
                 auto_data,
                 exact_replacements
             )
@@ -807,7 +822,7 @@ elif st.session_state.get('show_settings'):
                 
     with c2:
         st.subheader(_("Kişisel API Ayarların", "Personal API Settings", "Ваши настройки API", "إعدادات API الشخصية", "Paramètres d'API personnels", "Configuración personal de API"))
-        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД только для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط.", "Les clés saisies ici sont enregistrées en toute sécurité.", "Las claves ingresadas aquí se guardan de forma segura."))
+        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД tylko для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط.", "Les clés saisies ici sont enregistrées en toute sécurité.", "Las claves ingresadas aquí se guardan de forma segura."))
         
         k1 = st.text_input("Gemini API", st.session_state['settings_db'].get("genai_key", ""), type="password")
         k2 = st.text_input("LinkedIn Token", st.session_state['settings_db'].get("linkedin_token", ""), type="password")
