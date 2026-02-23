@@ -505,8 +505,16 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
         except Exception as e: return buffer
     return buffer
 
+def resize_for_instagram(image):
+    base_width = 1080
+    w_percent = (base_width / float(image.size[0]))
+    h_size = int((float(image.size[1]) * float(w_percent)))
+    img = image.resize((base_width, h_size), Image.Resampling.LANCZOS)
+    if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
+    return img
+
 # ==============================================================================
-# 🧠 V 132.0 - AI SIFIRDAN BELGE ÜRETİM MOTORU VE TABLO ÇİZİCİ
+# 🧠 V 132.1 - AI SIFIRDAN BELGE ÜRETİM MOTORU VE KATI ŞABLON YÖNETİMİ
 # ==============================================================================
 def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code, extra_params=None):
     if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
@@ -527,8 +535,10 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         def add_s9(key, label):
             val = extra_params.get(key, '')
             if val == '-': return
-            if not val: val = '[AI_ESTIMATE]'
-            s9_lines.append(f"- {label}: {val}")
+            if not val: 
+                s9_lines.append(f"- {label}: [AI_ESTIMATE]")
+            else:
+                s9_lines.append(f"- {label}: {val}")
             
         add_s9('p_state', 'Fiziksel Hali')
         add_s9('p_color', 'Renk')
@@ -572,7 +582,10 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         | Kimyasal Adı | EC No | CAS No | Konsantrasyon | GHS Sınıflandırması |
         (Fill the rows below the header based on the recipe provided).
 
-        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM CHANGING ANY VALUE PROVIDED BELOW. If a value is provided, output it EXACTLY as written. If it says '[AI_ESTIMATE]', replace it with your scientific estimation based on the chemistry:
+        For SECTION 9 (Physical Properties), YOU MUST STRICTLY USE THE EXACT VALUES PROVIDED BELOW. 
+        DO NOT append your own estimates in parentheses next to the provided values. ONLY output the value given.
+        If a value says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag with a scientific estimation. 
+        If a physical property is not in this list, do not invent it.
         {sec9_block}
 
         For SECTION 16 (Other Info), append these exact revision lines at the end if provided:
@@ -603,10 +616,12 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting:
         {sec1_block}
 
-        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM CHANGING ANY VALUE PROVIDED BELOW. If a value is provided, output it EXACTLY as written. If it says '[AI_ESTIMATE]', replace it with your scientific estimation:
+        For SECTION 9 (Physical Properties), YOU MUST STRICTLY USE THE EXACT VALUES PROVIDED BELOW. 
+        DO NOT append your own estimates in parentheses next to the provided values. ONLY output the value given.
+        If a value says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag with a scientific estimation. 
         {sec9_block}
         
-        DO NOT use markdown tables. Use bullet points instead.
+        DO NOT use markdown tables ('|' character). Use bullet points instead.
         DO NOT write header dates. Start directly with the main content.
         
         CRITICAL LANGUAGE RULE: 
@@ -650,18 +665,19 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
             except: pass
             
+        # V 132.1 - Header'da sağa dayalı (drawRightString) olan kısımları sola dayalı (drawString) yapıldı!
         if header_params and page_num == 1:
             canvas_obj.setFont(font_name, 9)
             canvas_obj.setFillColorRGB(0, 0, 0)
             hy = height - 25
             if header_params.get('c_date') and header_params.get('c_date') != '-':
-                canvas_obj.drawRightString(width - 40, hy, f"Oluşturma Tarihi: {header_params['c_date']}")
+                canvas_obj.drawString(40, hy, f"Oluşturma Tarihi: {header_params['c_date']}")
                 hy -= 12
             if header_params.get('r_date') and header_params.get('r_date') != '-':
-                canvas_obj.drawRightString(width - 40, hy, f"Revizyon Tarihi: {header_params['r_date']}")
+                canvas_obj.drawString(40, hy, f"Revizyon Tarihi: {header_params['r_date']}")
                 hy -= 12
             if header_params.get('vers') and header_params.get('vers') != '-':
-                canvas_obj.drawRightString(width - 40, hy, f"Versiyon: {header_params['vers']}")
+                canvas_obj.drawString(40, hy, f"Versiyon: {header_params['vers']}")
         
         canvas_obj.setStrokeColorRGB(0.7, 0.7, 0.7)
         canvas_obj.setLineWidth(1)
@@ -694,19 +710,19 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 continue
                 
             is_header = p.startswith('#')
-            clean_p = p.replace('#', '').replace('**', '').replace('*', '').strip()
+            clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
             
-            # V 132.0: ÖZEL TABLO ÇİZİM MOTORU
+            # V 132.0: ÖZEL TABLO ÇİZİM MOTORU (Boş bırakıyoruz çünkü tabloları ayıklaması lazım)
             if clean_p.startswith('|'):
                 if clean_p.replace('|', '').replace('-', '').replace(':', '').replace(' ', '') == '':
-                    continue # Ayracı atla
+                    continue 
                 
                 cols = [col.strip() for col in clean_p.strip('|').split('|')]
-                col_bounds = [40, 160, 230, 310, 390, 555] # 5 Sütunlu tablo sınırları
+                col_bounds = [40, 160, 230, 310, 390, 555] 
                 
                 c.setLineWidth(0.5)
                 c.setStrokeColorRGB(0.5, 0.5, 0.5)
-                c.line(40, text_y + 10, 555, text_y + 10) # Üst çizgi
+                c.line(40, text_y + 10, 555, text_y + 10) 
                 
                 col_wrapped = []
                 for i, col_txt in enumerate(cols):
@@ -738,9 +754,9 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                             c.drawString(col_bounds[i] + 5, text_y, cw_list[line_idx])
                     text_y -= 12
                     
-                c.line(40, text_y + 10, 555, text_y + 10) # Alt çizgi
+                c.line(40, text_y + 10, 555, text_y + 10) 
                 for b in col_bounds:
-                    c.line(b, row_start_y, b, text_y + 10) # Dikey çizgiler
+                    c.line(b, row_start_y, b, text_y + 10) 
                 
                 text_y -= 4
                 continue
