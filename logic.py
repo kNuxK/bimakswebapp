@@ -505,16 +505,8 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
         except Exception as e: return buffer
     return buffer
 
-def resize_for_instagram(image):
-    base_width = 1080
-    w_percent = (base_width / float(image.size[0]))
-    h_size = int((float(image.size[1]) * float(w_percent)))
-    img = image.resize((base_width, h_size), Image.Resampling.LANCZOS)
-    if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
-    return img
-
 # ==============================================================================
-# 🧠 V 131.2 - AI SIFIRDAN BELGE ÜRETİM MOTORU (KATI ŞABLON KURALLI)
+# 🧠 V 132.0 - AI SIFIRDAN BELGE ÜRETİM MOTORU VE TABLO ÇİZİCİ
 # ==============================================================================
 def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code, extra_params=None):
     if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
@@ -572,17 +564,18 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         2. Determine the UN Number for Section 14.
         3. Structure the output strictly into the standard 16 SDS sections.
         
-        STRICT TEMPLATE RULES:
-        For SECTION 1 (Identification), you MUST exactly include this information:
+        STRICT TEMPLATE RULES (YOU MUST FOLLOW THESE OR FAIL):
+        For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting any line:
         {sec1_block}
 
-        For SECTION 3 (Composition), DO NOT USE markdown tables. Use a clean bulleted list instead:
-        * **Kimyasal Adı:** [Name], **CAS No:** [CAS], **Konsantrasyon:** [%], **Sınıflandırma:** [Class]
+        For SECTION 3 (Composition), you MUST output the ingredients as a Markdown table with EXACTLY these 5 columns:
+        | Kimyasal Adı | EC No | CAS No | Konsantrasyon | GHS Sınıflandırması |
+        (Fill the rows below the header based on the recipe provided).
 
-        For SECTION 9 (Physical Properties), use these exact lines. If a value says '[AI_ESTIMATE]', you MUST replace it with your scientific estimation based on the chemistry. If a physical property is not in this list, do not generate it:
+        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM CHANGING ANY VALUE PROVIDED BELOW. If a value is provided, output it EXACTLY as written. If it says '[AI_ESTIMATE]', replace it with your scientific estimation based on the chemistry:
         {sec9_block}
 
-        For SECTION 16 (Other Info), append these exact revision lines if provided:
+        For SECTION 16 (Other Info), append these exact revision lines at the end if provided:
         {sec16_block}
         
         DO NOT write "Oluşturma Tarihi" or "Revizyon Tarihi" at the very beginning of the document. Start directly with "BÖLÜM 1".
@@ -607,13 +600,13 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         4. Suggest 'Application & Dosage'.
         
         STRICT TEMPLATE RULES:
-        For SECTION 1 (Identification), you MUST exactly include this information:
+        For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting:
         {sec1_block}
 
-        For SECTION 9 (Physical Properties), use these exact lines. If a value says '[AI_ESTIMATE]', replace it with your scientific estimation.
+        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM CHANGING ANY VALUE PROVIDED BELOW. If a value is provided, output it EXACTLY as written. If it says '[AI_ESTIMATE]', replace it with your scientific estimation:
         {sec9_block}
         
-        DO NOT use markdown tables ('|' character). Use bullet points instead.
+        DO NOT use markdown tables. Use bullet points instead.
         DO NOT write header dates. Start directly with the main content.
         
         CRITICAL LANGUAGE RULE: 
@@ -701,7 +694,56 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 continue
                 
             is_header = p.startswith('#')
-            clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
+            clean_p = p.replace('#', '').replace('**', '').replace('*', '').strip()
+            
+            # V 132.0: ÖZEL TABLO ÇİZİM MOTORU
+            if clean_p.startswith('|'):
+                if clean_p.replace('|', '').replace('-', '').replace(':', '').replace(' ', '') == '':
+                    continue # Ayracı atla
+                
+                cols = [col.strip() for col in clean_p.strip('|').split('|')]
+                col_bounds = [40, 160, 230, 310, 390, 555] # 5 Sütunlu tablo sınırları
+                
+                c.setLineWidth(0.5)
+                c.setStrokeColorRGB(0.5, 0.5, 0.5)
+                c.line(40, text_y + 10, 555, text_y + 10) # Üst çizgi
+                
+                col_wrapped = []
+                for i, col_txt in enumerate(cols):
+                    if i < len(col_bounds) - 1:
+                        col_w = col_bounds[i+1] - col_bounds[i]
+                        char_w = max(5, int(col_w / 5.5))
+                        wrapped = textwrap.wrap(col_txt, width=char_w) if col_txt else [""]
+                    else:
+                        wrapped = [col_txt[:20]]
+                    col_wrapped.append(wrapped)
+                    
+                max_lines = max([len(w) for w in col_wrapped]) if col_wrapped else 1
+                row_start_y = text_y + 10
+                
+                for line_idx in range(max_lines):
+                    if text_y < 85: 
+                        c.line(40, text_y + 10, 555, text_y + 10)
+                        for b in col_bounds: c.line(b, row_start_y, b, text_y + 10)
+                        c.showPage()
+                        page_num += 1
+                        draw_bg(c, page_num)
+                        text_y = height - 110
+                        c.setFont(font_name, 9)
+                        row_start_y = text_y + 10
+                        c.line(40, text_y + 10, 555, text_y + 10)
+                    
+                    for i, cw_list in enumerate(col_wrapped):
+                        if i < len(col_bounds) - 1 and line_idx < len(cw_list):
+                            c.drawString(col_bounds[i] + 5, text_y, cw_list[line_idx])
+                    text_y -= 12
+                    
+                c.line(40, text_y + 10, 555, text_y + 10) # Alt çizgi
+                for b in col_bounds:
+                    c.line(b, row_start_y, b, text_y + 10) # Dikey çizgiler
+                
+                text_y -= 4
+                continue
             
             if is_header:
                 c.setFont(font_name, 12)
@@ -736,7 +778,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        
         old_prod = ""
         table_prod_x0 = 150 
         if auto_data:
@@ -766,10 +807,8 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
                     page.add_redact_annot(rect, fill=(1,1,1))
                     page.apply_redactions()
-                    
                     if page.number == 0: fsz = (inst.y1 - inst.y0) * 0.75
                     else: fsz = (inst.y1 - inst.y0) * 0.60 
-                        
                     if fsz < 5: fsz = 8
                     page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
 
@@ -777,31 +816,25 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
                     inst_ted = page.search_for("TEDARİKÇİ")
-                    
                     inst_tel = page.search_for("Tel:")
                     if not inst_tel: inst_tel = page.search_for("Tel :")
                     if not inst_tel: inst_tel = page.search_for("Tel")
-                    
                     if inst_ted and inst_tel:
                         ted = inst_ted[0]
                         valid_tels = [t for t in inst_tel if t.y0 > ted.y1]
                         if valid_tels:
                             valid_tels.sort(key=lambda t: t.y0)
                             tel = valid_tels[0]
-                            
                             if (tel.y0 - ted.y1) < 150: 
                                 words_pg0 = page.get_text("words")
                                 t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
                                 addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
-                                
                                 addr_y0 = ted.y1 + 2
                                 addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
-                                
                                 if addr_y1 > addr_y0:
                                     rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
                                     page.add_redact_annot(rect, fill=(1,1,1))
                                     page.apply_redactions()
-                                    
                                     y_cursor = addr_y0 + 10
                                     for line in new_add.split('\n'):
                                         page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
@@ -810,13 +843,10 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
             if auto_data:
                 words = page.get_text("words")
                 processed_keys = set()
-                
                 for key, (separator, new_val) in auto_data.items():
                     if not new_val or key == "ADDRESS" or key == "ÜRÜN ADI": continue 
-                    
                     base_key = key.replace(":", "").strip()
                     if base_key in processed_keys: continue
-                    
                     insts = page.search_for(key)
                     if insts:
                         processed_keys.add(base_key)
@@ -825,7 +855,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             if tw:
                                 min_x = min(w[0] for w in tw)
                                 max_x = max(w[2] for w in tw)
-                                
                                 if base_key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ", "ACİL DURUM TELEFONU", "ACİL DURUM TEL"]:
                                     start_x = table_prod_x0 
                                 elif base_key in ["Tel", "Fax", "E-mail", "Web"]:
@@ -834,60 +863,41 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                     start_x = inst.x0 + 90  
                                 else:
                                     start_x = inst.x1 + 4
-                                
                                 safe_left_bound = inst.x1 + 2
                                 start_x = max(start_x, safe_left_bound)
-                                
                                 wipe_x = min(min_x, start_x) - 2
                                 wipe_x = max(wipe_x, safe_left_bound)
-                                
                                 rect = fitz.Rect(wipe_x, inst.y0, max_x + 5, inst.y1)
                                 page.add_redact_annot(rect, fill=(1,1,1))
                                 page.apply_redactions()
-                                
                                 fsz = (inst.y1 - inst.y0) * 0.75
                                 if fsz < 6: fsz = 9
-                                
                                 final_text = f"{separator}{new_val}"
                                 page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
             if exact_replacements:
                 for item in exact_replacements:
-                    if len(item) == 4:
-                        old_text, new_text, is_bold, is_center = item
-                    else:
-                        old_text, new_text = item[:2]
-                        is_bold = False
-                        is_center = False
-                        
+                    if len(item) == 4: old_text, new_text, is_bold, is_center = item
+                    else: old_text, new_text, is_bold, is_center = item[0], item[1], False, False
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
                         text_instances = page.search_for(str(old_text))
                         for inst in text_instances:
                             will_center = False
-                            if is_center and inst.y1 < 150:
-                                will_center = True
-                                
+                            if is_center and inst.y1 < 150: will_center = True
                             rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
                             page.add_redact_annot(rect, fill=(1, 1, 1))
                             page.apply_redactions()
-                            
                             fsz = (inst.y1 - inst.y0) * 0.75
                             if fsz < 6: fsz = 9
-                            
                             font_to_use = "hebo" if is_bold else "helv"
-                            
                             if will_center:
                                 try:
                                     font = fitz.Font(font_to_use)
                                     text_width = font.text_length(str(new_text), fontsize=fsz)
                                     target_x = (page.rect.width - text_width) / 2
-                                except:
-                                    target_x = inst.x0
-                            else:
-                                target_x = inst.x0 
-                                
+                                except: target_x = inst.x0
+                            else: target_x = inst.x0 
                             page.insert_text((target_x, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname=font_to_use)
-
         output = io.BytesIO()
         doc.save(output)
         output.seek(0)
@@ -901,16 +911,12 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                       logo_x, logo_y, logo_w, addr_x, addr_y, lang_code, 
                       auto_data=None, exact_replacements=None):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
-    
     if auto_data or exact_replacements:
         original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data, exact_replacements)
-        
     try:
         original_pdf = PdfReader(io.BytesIO(original_pdf_bytes))
         writer = PdfWriter()
-        
         packet = io.BytesIO()
-        
         width, height = 595.27, 841.89
         try:
             first_page = original_pdf.pages[0] if hasattr(original_pdf, "pages") else original_pdf.getPage(0)
@@ -918,17 +924,13 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             width = float(mbox.width) if hasattr(mbox, "width") else (float(mbox.getWidth()) if hasattr(mbox, "getWidth") else float(mbox[2]))
             height = float(mbox.height) if hasattr(mbox, "height") else (float(mbox.getHeight()) if hasattr(mbox, "getHeight") else float(mbox[3]))
         except: pass
-            
         c = canvas.Canvas(packet, pagesize=(width, height))
-        
         if top_mask_h > 0 and top_mask_w > 0:
             c.setFillColorRGB(1, 1, 1)
             c.rect(top_mask_x, height - top_mask_y - top_mask_h, top_mask_w, top_mask_h, fill=1, stroke=0)
-            
         if bot_mask_h > 0 and bot_mask_w > 0:
             c.setFillColorRGB(1, 1, 1)
             c.rect(bot_mask_x, height - bot_mask_y - bot_mask_h, bot_mask_w, bot_mask_h, fill=1, stroke=0)
-        
         if dealer_logo_bytes:
             try:
                 logo_img = ImageReader(io.BytesIO(dealer_logo_bytes))
@@ -937,7 +939,6 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                 logo_h = logo_w * aspect
                 c.drawImage(logo_img, logo_x, height - logo_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
             except: pass
-            
         if dealer_address:
             try:
                 f_reg = register_embedded_font() or "Helvetica"
@@ -948,21 +949,15 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                     txt.textLine(line[:150])
                 c.drawText(txt)
             except: pass
-            
         c.save()
         packet.seek(0)
         overlay_pdf = PdfReader(packet)
         overlay_page = overlay_pdf.pages[0] if hasattr(overlay_pdf, "pages") else overlay_pdf.getPage(0)
-        
         pages_list = original_pdf.pages if hasattr(original_pdf, "pages") else [original_pdf.getPage(i) for i in range(original_pdf.getNumPages())]
-        
         for page in pages_list:
-            if hasattr(page, "merge_page"):
-                page.merge_page(overlay_page)
-            elif hasattr(page, "mergePage"):
-                page.mergePage(overlay_page)
+            if hasattr(page, "merge_page"): page.merge_page(overlay_page)
+            elif hasattr(page, "mergePage"): page.mergePage(overlay_page)
             writer.add_page(page)
-            
         output = io.BytesIO()
         writer.write(output)
         output.seek(0)
@@ -977,11 +972,9 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                          auto_data=None, exact_replacements=None):
     width, height = 595, 842 
     img = None
-    
     if original_pdf_bytes and HAS_PYMUPDF:
         if auto_data or exact_replacements:
             original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data, exact_replacements)
-            
         try:
             doc = fitz.open(stream=original_pdf_bytes, filetype="pdf")
             page = doc.load_page(0)
@@ -989,20 +982,15 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             img = img.resize((width, height), Image.Resampling.LANCZOS) 
         except: pass
-            
     if img is None:
         img = Image.new('RGB', (width, height), color=(240, 240, 240)) 
         draw = ImageDraw.Draw(img)
         draw.text((40, 400), "ORIJINAL PDF GORUNTUSU ICIN LUTFEN 'PyMuPDF' KUTUPHANESINI YUKLEYIN", fill=(150, 150, 150))
-    
     draw = ImageDraw.Draw(img)
-    
     if top_mask_h > 0 and top_mask_w > 0:
         draw.rectangle([top_mask_x, top_mask_y, top_mask_x + top_mask_w, top_mask_y + top_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
-        
     if bot_mask_h > 0 and bot_mask_w > 0:
         draw.rectangle([bot_mask_x, bot_mask_y, bot_mask_x + bot_mask_w, bot_mask_y + bot_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
-    
     if dealer_logo_bytes:
         try:
             logo = Image.open(io.BytesIO(dealer_logo_bytes)).convert("RGBA")
@@ -1011,7 +999,6 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             logo = logo.resize((int(logo_w), logo_h), Image.Resampling.LANCZOS)
             img.paste(logo, (int(logo_x), int(logo_y)), logo)
         except: pass
-        
     if dealer_address:
         try:
             font = ImageFont.load_default()
@@ -1020,5 +1007,4 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                 draw.text((addr_x, y_text), line[:150], fill=(0, 0, 0), font=font)
                 y_text += 12 
         except: pass
-            
     return img
