@@ -551,7 +551,7 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 127.1 - LAZER KESİM REDAKSİYON (TDS AKILLI MERKEZLEME MOTORU)
+# 🧠 V 128.0 - LAZER KESİM REDAKSİYON (GLOBAL ALT BİLGİ DESTEĞİ)
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
@@ -560,41 +560,47 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME (SDS Ana Başlığı değiştirmek için)
+        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME
         old_prod = ""
+        table_prod_x0 = 150 
         if auto_data:
             try:
-                insts = doc[0].search_for("ÜRÜN ADI")
-                if insts:
-                    words = doc[0].get_text("words")
-                    tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
-                    if tw:
-                        tw.sort(key=lambda x: x[0])
-                        old_prod = " ".join([w[4] for w in tw])
+                for page in doc:
+                    insts = page.search_for("ÜRÜN ADI")
+                    if insts:
+                        words = page.get_text("words")
+                        tw = [w for w in words if w[1] < insts[0].y1+2 and w[3] > insts[0].y0-2 and w[0] >= insts[0].x1-2]
+                        if tw:
+                            tw.sort(key=lambda x: x[0])
+                            old_prod = " ".join([w[4] for w in tw])
+                            table_prod_x0 = tw[0][0] 
+                            break
             except: pass
 
         for page in doc:
-            # 2. LİNK KATİLİ (Tıklanabilir mavi E-Mail ve Web Bağlantılarını Temizle)
+            # 2. LİNK KATİLİ
             try:
                 for link in page.get_links(): 
                     page.delete_link(link)
             except: pass
             
-            # 3. SDS İÇİN SAYFA 0 (İLK SAYFA) GLOBAL DEĞİŞTİRİCİLERİ
-            if page.number == 0 and auto_data:
-                if old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
-                    new_prod = str(auto_data["ÜRÜN ADI"][1])
-                    o_insts = page.search_for(old_prod)
-                    for inst in o_insts:
-                        rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
-                        page.add_redact_annot(rect, fill=(1,1,1))
-                        page.apply_redactions()
+            # 3. ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
+            if auto_data and old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
+                new_prod = str(auto_data["ÜRÜN ADI"][1])
+                o_insts = page.search_for(old_prod)
+                for inst in o_insts:
+                    rect = fitz.Rect(inst.x0 - 1, inst.y0 - 2, inst.x1 + 1, inst.y1 + 2)
+                    page.add_redact_annot(rect, fill=(1,1,1))
+                    page.apply_redactions()
+                    
+                    if page.number == 0: fsz = (inst.y1 - inst.y0) * 0.75
+                    else: fsz = (inst.y1 - inst.y0) * 0.60 
                         
-                        fsz = (inst.y1 - inst.y0) * 0.75
-                        if fsz < 6: fsz = 9
-                        page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
-                
-                # ADRES BLOK OTOMASYONU
+                    if fsz < 5: fsz = 8
+                    page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
+
+            # 4. SADECE SAYFA 0'A ÖZEL ADRES BLOK OTOMASYONU (Koruma Kalkanlı)
+            if page.number == 0 and auto_data:
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
                     inst_ted = page.search_for("TEDARİKÇİ")
@@ -610,64 +616,69 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             valid_tels.sort(key=lambda t: t.y0)
                             tel = valid_tels[0]
                             
-                            if (tel.y0 - ted.y1) < 150: 
-                                words_pg0 = page.get_text("words")
-                                t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
-                                addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
+                            words_pg0 = page.get_text("words")
+                            t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
+                            addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
+                            
+                            addr_y0 = ted.y1 + 2
+                            addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
+                            
+                            if addr_y1 > addr_y0:
+                                rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
+                                page.add_redact_annot(rect, fill=(1,1,1))
+                                page.apply_redactions()
                                 
-                                addr_y0 = ted.y1 + 2
-                                addr_y1 = tel.y0 - 2
-                                
-                                if addr_y1 > addr_y0:
-                                    rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
-                                    page.add_redact_annot(rect, fill=(1,1,1))
-                                    page.apply_redactions()
-                                    
-                                    y_cursor = addr_y0 + 10
-                                    for line in new_add.split('\n'):
-                                        page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
-                                        y_cursor += 12
+                                y_cursor = addr_y0 + 10
+                                for line in new_add.split('\n'):
+                                    page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
+                                    y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI (SDS)
+            # 5. AKILLI BAŞLIK YAKALAYICI VE LAZER TEMİZLEYİCİ
             if auto_data:
                 words = page.get_text("words")
+                processed_keys = set()
+                
                 for key, (separator, new_val) in auto_data.items():
                     if not new_val or key == "ADDRESS" or key == "ÜRÜN ADI": continue 
                     
+                    base_key = key.replace(":", "").strip()
+                    if base_key in processed_keys: continue
+                    
                     insts = page.search_for(key)
-                    for inst in insts:
-                        tw = [w for w in words if w[1] < inst.y1+3 and w[3] > inst.y0-3 and w[0] >= inst.x1-2]
-                        if tw:
-                            min_x = min(w[0] for w in tw)
-                            max_x = max(w[2] for w in tw)
-                            
-                            start_x = min_x
-                            if key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ"]:
-                                start_x = inst.x0 + 132 
-                            elif key in ["Tel:", "Fax:", "E-mail:", "Web:"]:
-                                start_x = inst.x0 + 35  
-                            elif key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
-                                start_x = inst.x0 + 95  
-                            else:
-                                start_x = inst.x1 + 8 
-                            
-                            safe_left_bound = inst.x1 + 2
-                            start_x = max(start_x, safe_left_bound)
-                            
-                            wipe_x = min(min_x, start_x) - 2
-                            wipe_x = max(wipe_x, safe_left_bound)
-                            
-                            rect = fitz.Rect(wipe_x, inst.y0, max_x + 5, inst.y1)
-                            page.add_redact_annot(rect, fill=(1,1,1))
-                            page.apply_redactions()
-                            
-                            fsz = (inst.y1 - inst.y0) * 0.75
-                            if fsz < 6: fsz = 9
-                            
-                            final_text = f"{separator}{new_val}"
-                            page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
+                    if insts:
+                        processed_keys.add(base_key)
+                        for inst in insts:
+                            tw = [w for w in words if w[1] < inst.y1+3 and w[3] > inst.y0-3 and w[0] >= inst.x1-2]
+                            if tw:
+                                min_x = min(w[0] for w in tw)
+                                max_x = max(w[2] for w in tw)
+                                
+                                if base_key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ", "ACİL DURUM TELEFONU", "ACİL DURUM TEL"]:
+                                    start_x = table_prod_x0 
+                                elif base_key in ["Tel", "Fax", "E-mail", "Web"]:
+                                    start_x = inst.x0 + 40  
+                                elif base_key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
+                                    start_x = inst.x0 + 90  
+                                else:
+                                    start_x = inst.x1 + 4
+                                
+                                safe_left_bound = inst.x1 + 2
+                                start_x = max(start_x, safe_left_bound)
+                                
+                                wipe_x = min(min_x, start_x) - 2
+                                wipe_x = max(wipe_x, safe_left_bound)
+                                
+                                rect = fitz.Rect(wipe_x, inst.y0, max_x + 5, inst.y1)
+                                page.add_redact_annot(rect, fill=(1,1,1))
+                                page.apply_redactions()
+                                
+                                fsz = (inst.y1 - inst.y0) * 0.75
+                                if fsz < 6: fsz = 9
+                                
+                                final_text = f"{separator}{new_val}"
+                                page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin Akıllı Merkezleme)
+            # 6. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin)
             if exact_replacements:
                 for item in exact_replacements:
                     if len(item) == 4:
@@ -680,7 +691,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
                         text_instances = page.search_for(str(old_text))
                         for inst in text_instances:
-                            # V 127.1: AKILLI MERKEZLEME (Eğer yazı sayfanın en başındaysa ortala, yoksa gövdededir orijinal hizada bırak!)
                             will_center = False
                             if is_center and inst.y1 < 150:
                                 will_center = True
@@ -702,7 +712,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                 except:
                                     target_x = inst.x0
                             else:
-                                target_x = inst.x0 # Gövde içindeki kelimeleri orijinal hizasında bırakır
+                                target_x = inst.x0 
                                 
                             page.insert_text((target_x, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname=font_to_use)
 
@@ -754,6 +764,18 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                 aspect = pil_img.height / pil_img.width
                 logo_h = logo_w * aspect
                 c.drawImage(logo_img, logo_x, height - logo_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
+            except: pass
+            
+        # V 128.0 - Tüm sayfalara eklenecek Alt Bilgi (Footer) Adres Motoru
+        if dealer_address:
+            try:
+                f_reg = register_embedded_font() or "Helvetica"
+                c.setFont(f_reg, 9)
+                c.setFillColorRGB(0, 0, 0) 
+                txt = c.beginText(addr_x, height - addr_y) 
+                for line in dealer_address.split('\n'):
+                    txt.textLine(line[:150])
+                c.drawText(txt)
             except: pass
             
         c.save()
@@ -817,6 +839,15 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             logo_h = int(logo_w * aspect)
             logo = logo.resize((int(logo_w), logo_h), Image.Resampling.LANCZOS)
             img.paste(logo, (int(logo_x), int(logo_y)), logo)
+        except: pass
+        
+    if dealer_address:
+        try:
+            font = ImageFont.load_default()
+            y_text = addr_y 
+            for line in dealer_address.split('\n'):
+                draw.text((addr_x, y_text), line[:150], fill=(0, 0, 0), font=font)
+                y_text += 12 
         except: pass
             
     return img
