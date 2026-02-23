@@ -554,7 +554,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
-    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 131.1 - KATI ŞABLON ENTEGRASYONU)
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 131.2 - HATASIZ KEYWORD ARGUMENT GEÇİŞİ)
     elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
         st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
         st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
@@ -638,13 +638,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         st.error(res_text)
                     else:
                         st.session_state['generated_sds_content'] = res_text
-                        # V 131.1 - Header Params PDF çiziciye gönderiliyor
+                        
+                        # V 131.2: Keyword arguments (Parametre isimleri) ile garantili gönderim!
                         pdf_bytes = logic.create_generated_document_pdf(
-                            res_text, 
-                            gen_logo.getvalue() if gen_logo else None, 
-                            gen_footer, 
-                            st.session_state['lang'],
-                            extra_params
+                            text_content=res_text, 
+                            logo_bytes=gen_logo.getvalue() if gen_logo else None, 
+                            footer_text=gen_footer, 
+                            lang_code=st.session_state.get('lang', 'TR'),
+                            header_params=extra_params
                         )
                         
                         if pdf_bytes:
