@@ -306,7 +306,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         with st.expander(_("📄 Antetli Kağıt Ayarı", "📄 Letterhead Setup", "📄 Настройка бланка", "📄 إعداد الترويسة", "📄 Config. En-tête", "📄 Config. Membrete"), expanded=True):
             default_antet = "antetlikagit.pdf"
             
-            ut = st.file_uploader(_("Yeni Antet Yükle:", "Upload New Letterhead:", "Загрузить yeni бланк:", "تحميل ترويسة جديدة:", "Nouveau En-tête :", "Nuevo Membrete:"), type=['png', 'jpg', 'jpeg', 'pdf'], key="quote_antet")
+            ut = st.file_uploader(_("Yeni Antet Yükle:", "Upload New Letterhead:", "Загрузить новый бланк:", "تحميل ترويسة جديدة:", "Nouveau En-tête :", "Nuevo Membrete:"), type=['png', 'jpg', 'jpeg', 'pdf'], key="quote_antet")
             
             if ut: 
                 st.session_state['template_data'] = ut.getvalue()
@@ -554,7 +554,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
-    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 132.0 - KATI ŞABLON ENTEGRASYONU)
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 132.1 - HİZALAMALAR VE KATI KURALLAR)
     elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
         st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
         st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
