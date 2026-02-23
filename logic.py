@@ -37,7 +37,6 @@ except ImportError:
     except ImportError:
         HAS_PYPDF = False
 
-# PDF Canlı Önizleme ve Metin Değiştirme Kütüphanesi
 try:
     import fitz 
     HAS_PYMUPDF = True
@@ -93,7 +92,6 @@ def get_role_definitions():
 
 def update_role_definitions(admin_p, bimaks_p, yeni_p):
     st.session_state['cached_roles'] = {"Admin": admin_p, "Bimaks Üye": bimaks_p, "Yeni Üye": yeni_p}
-    
     sheet = get_db_sheet()
     if not sheet: return False
     try:
@@ -112,20 +110,16 @@ def ping_online(username):
     try:
         now = time.time()
         last_ping = st.session_state.get('last_ping_time', 0)
-        if now - last_ping < 60: 
-            return 
-            
+        if now - last_ping < 60: return 
         sheet = get_db_sheet()
         if not sheet: return
-        
         users = sheet.col_values(1)
         if username in users:
             row_idx = users.index(username) + 1
             now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
             sheet.update_cell(row_idx, 8, now_str)
             st.session_state['last_ping_time'] = now
-    except: 
-        pass 
+    except: pass 
 
 def login_user(username, password):
     sheet = get_db_sheet()
@@ -134,25 +128,19 @@ def login_user(username, password):
         rows = sheet.get_all_values()
         hashed_pw = hash_password(password)
         role_defs = None 
-        
         for i, r in enumerate(rows):
             if i == 0 or (len(r)>0 and r[0] == '__ROLE_DEFS__'): continue 
             r_user = r[0] if len(r) > 0 else ""
             r_pass = r[1] if len(r) > 1 else ""
-            
             if str(r_user) == username and str(r_pass) == hashed_pw:
                 r_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin" 
-                
                 now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
                 try: sheet.update_cell(i + 1, 8, now_str)
                 except: pass 
-                
                 if not role_defs: role_defs = get_role_definitions()
-                
                 r_perms = role_defs.get(r_role, "")
                 if r_role.lower() == "admin" and not r_perms:
                     r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds,tech_sds_gen"
-                
                 data = {
                     "username": r_user,
                     "genai_key": r[2] if len(r) > 2 else "",
@@ -175,7 +163,6 @@ def register_user(username, password, role="Yeni Üye"):
         for r in rows:
             if len(r) > 0 and str(r[0]) == username:
                 return False, "Bu kullanıcı adı zaten alınmış!"
-        
         hashed_pw = hash_password(password)
         now_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
         new_row = [username, hashed_pw, "", "", "", "", role, now_str]
@@ -198,15 +185,12 @@ def update_user_keys(username, genai, li, insta, insta_id):
             return True
         return False
     except Exception as e:
-        st.error(f"Güncelleme Hatası: {e}")
         return False
 
 def get_all_users_status():
     try:
         sheet = get_db_sheet()
-        if not sheet: 
-            return st.session_state.get('cached_users', [])
-            
+        if not sheet: return st.session_state.get('cached_users', [])
         rows = sheet.get_all_values()
         if len(rows) <= 1: return []
         users = []
@@ -215,24 +199,13 @@ def get_all_users_status():
             if not u_name or u_name == '__ROLE_DEFS__': continue
             u_role = r[6] if len(r) > 6 and str(r[6]).strip() != "" else "Admin"
             u_last = r[7] if len(r) > 7 else "Hiç girmedi"
-            
-            users.append({
-                "username": u_name,
-                "role": u_role,
-                "last_seen": u_last
-            })
-        
+            users.append({"username": u_name, "role": u_role, "last_seen": u_last})
         st.session_state['cached_users'] = users
         return users
     except Exception as e:
         return st.session_state.get('cached_users', [])
 
 def update_user_role(username, new_role):
-    if 'cached_users' in st.session_state:
-        for u in st.session_state['cached_users']:
-            if u['username'] == username:
-                u['role'] = new_role
-                
     sheet = get_db_sheet()
     if not sheet: return False
     try:
@@ -242,8 +215,7 @@ def update_user_role(username, new_role):
             sheet.update_cell(row_idx, 7, new_role)
             return True
         return False
-    except:
-        return False
+    except: return False
 
 def delete_user(target_username):
     sheet = get_db_sheet()
@@ -252,12 +224,9 @@ def delete_user(target_username):
         users = sheet.col_values(1)
         if target_username in users:
             row_idx = users.index(target_username) + 1
-            if row_idx == 1:
-                return False, "Başlık satırı silinemez!"
-            try:
-                sheet.delete_rows(row_idx)
-            except AttributeError:
-                sheet.delete_row(row_idx)
+            if row_idx == 1: return False, "Başlık satırı silinemez!"
+            try: sheet.delete_rows(row_idx)
+            except AttributeError: sheet.delete_row(row_idx)
             return True, f"'{target_username}' başarıyla silindi."
         return False, "Kullanıcı bulunamadı."
     except Exception as e:
@@ -296,17 +265,12 @@ def save_history_entry(topic, role):
     st.session_state['history_db'].insert(0, {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "topic": topic, "role": role})
 
 def force_clean_text(text):
-    if not text or not isinstance(text, str):
-        return "⚠️ HATA: İçerik oluşturulamadı. Lütfen API kotanızı kontrol edin."
-        
+    if not text or not isinstance(text, str): return "⚠️ HATA: İçerik oluşturulamadı."
     if "ACT AS:" in text.upper() or "MISSION:" in text.upper():
-        if "---" in text:
-            text = text.split("---")[-1].strip()
+        if "---" in text: text = text.split("---")[-1].strip()
         else:
             match = re.search(r'FORMATTING:.*?\n(.*)', text, flags=re.IGNORECASE | re.DOTALL)
-            if match:
-                text = match.group(1).strip()
-    
+            if match: text = match.group(1).strip()
     text = re.sub(r'^(Merhaba|Ben|Sen|Biz|Bir yapay zeka|Yapay zeka|İşte makaleniz|Hazırladığım|Here is|Sure|As requested|Here\'s|I have written).*?[\.\!\?]\s*', '', text, flags=re.IGNORECASE)
     return text.strip()
 
@@ -322,8 +286,7 @@ def get_gemini_response_from_manual(full_prompt, api_key):
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(full_prompt)
-            if response and response.text:
-                return response.text
+            if response and response.text: return response.text
         except Exception as e:
             last_err = str(e)
             time.sleep(0.5) 
@@ -542,8 +505,16 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
         except Exception as e: return buffer
     return buffer
 
+def resize_for_instagram(image):
+    base_width = 1080
+    w_percent = (base_width / float(image.size[0]))
+    h_size = int((float(image.size[1]) * float(w_percent)))
+    img = image.resize((base_width, h_size), Image.Resampling.LANCZOS)
+    if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
+    return img
+
 # ==============================================================================
-# 🧠 V 131.1 - AI SIFIRDAN BELGE ÜRETİM MOTORU (KATI ŞABLON KURALLI)
+# 🧠 V 131.2 - AI SIFIRDAN BELGE ÜRETİM MOTORU (KATI ŞABLON KURALLI)
 # ==============================================================================
 def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code, extra_params=None):
     if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
@@ -665,7 +636,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
             continue
     return f"❌ HATA / ERROR: API Bağlantı Sorunu. Detay: {last_err}"
 
-def create_generated_document_pdf(text_content, logo_bytes, footer_text, lang_code, header_params=None):
+def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=None, lang_code="TR", header_params=None):
     if not HAS_REPORTLAB: return None
     buffer = io.BytesIO()
     width, height = A4
@@ -722,34 +693,35 @@ def create_generated_document_pdf(text_content, logo_bytes, footer_text, lang_co
     draw_bg(c, page_num)
     text_y = height - 110
     
-    for p in text_content.split('\n'):
-        p = p.strip()
-        if not p:
-            text_y -= 8
-            continue
-            
-        is_header = p.startswith('#')
-        clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
-        
-        if is_header:
-            c.setFont(font_name, 12)
-            text_y -= 6
-        else:
-            c.setFont(font_name, 9)
-            
-        wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
-        
-        for wl in wrapped:
-            if text_y < 85: 
-                c.showPage()
-                page_num += 1
-                draw_bg(c, page_num)
-                text_y = height - 110
-                c.setFont(font_name, 12 if is_header else 9)
+    if text_content:
+        for p in text_content.split('\n'):
+            p = p.strip()
+            if not p:
+                text_y -= 8
+                continue
                 
-            c.drawString(40, text_y, wl)
-            text_y -= 12
-        text_y -= 4 
+            is_header = p.startswith('#')
+            clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
+            
+            if is_header:
+                c.setFont(font_name, 12)
+                text_y -= 6
+            else:
+                c.setFont(font_name, 9)
+                
+            wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
+            
+            for wl in wrapped:
+                if text_y < 85: 
+                    c.showPage()
+                    page_num += 1
+                    draw_bg(c, page_num)
+                    text_y = height - 110
+                    c.setFont(font_name, 12 if is_header else 9)
+                    
+                c.drawString(40, text_y, wl)
+                text_y -= 12
+            text_y -= 4 
             
     c.save()
     buffer.seek(0)
