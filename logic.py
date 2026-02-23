@@ -71,8 +71,9 @@ def get_db_sheet():
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+# V 129.0 - Yeni yetki eklendi: tech_sds_gen (Admin'de açık, diğerlerinde kapalı)
 def get_role_definitions():
-    defs = {"Admin": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
+    defs = {"Admin": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds,tech_sds_gen", 
             "Bimaks Üye": "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds", 
             "Yeni Üye": ""}
     try:
@@ -151,7 +152,7 @@ def login_user(username, password):
                 
                 r_perms = role_defs.get(r_role, "")
                 if r_role.lower() == "admin" and not r_perms:
-                    r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds"
+                    r_perms = "smy,smy_li,smy_in,tech,tech_an,tech_roi,tech_ocr,tech_reg,tech_quo,tech_sds,tech_sds_gen"
                 
                 data = {
                     "username": r_user,
@@ -329,6 +330,70 @@ def get_gemini_response_from_manual(full_prompt, api_key):
             time.sleep(0.5) 
             continue
     return f"❌ HATA / ERROR: {last_err}"
+
+# V 129.0 - SIFIRDAN SDS/TDS ÜRETİM MOTORU
+def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code):
+    if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
+    lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
+    lang_name = lang_dict.get('name', 'Turkish')
+    
+    if "SDS" in doc_type:
+        prompt = f"""
+        ACT AS: A Senior Chemical Regulatory Expert and Toxicologist.
+        MISSION: Generate a comprehensive 16-section Safety Data Sheet (SDS / GBF) according to GHS/CLP and REACH regulations based on the provided recipe.
+        
+        PRODUCT NAME: {product_name}
+        PRODUCT INTENDED USE: {product_type}
+        INGREDIENTS & COMPOSITION:
+        {ingredients}
+        
+        REQUIREMENTS:
+        1. Calculate or estimate the hazard classifications (H-codes, P-codes) based on the chemistry of the ingredients.
+        2. Determine the appropriate UN Number and transport class for Section 14.
+        3. Provide realistic first aid, firefighting, and handling measures.
+        4. Structure the output strictly into the standard 16 SDS sections.
+        5. Use Markdown formatting with bold headers for readability.
+        
+        CRITICAL LANGUAGE RULE: 
+        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
+        """
+    else:
+        prompt = f"""
+        ACT AS: A Senior Chemical Engineer and Product Manager.
+        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product recipe.
+        
+        PRODUCT NAME: {product_name}
+        PRODUCT INTENDED USE: {product_type}
+        INGREDIENTS & COMPOSITION (Use this context to write the TDS, but DO NOT expose exact secret percentages in the public text):
+        {ingredients}
+        
+        REQUIREMENTS:
+        1. Provide a strong 'Product Description' (Ürün Tanımı).
+        2. List 'Application Areas' (Kullanım Alanları).
+        3. List 'Features & Benefits' (Özellikleri ve Avantajları) based on the active ingredients.
+        4. Suggest 'Application & Dosage' (Kullanım Şekli ve Miktarı) instructions for industrial use.
+        5. Provide a 'Physical Properties' table (estimate pH, appearance, density based on ingredients).
+        6. Use Markdown formatting.
+        
+        CRITICAL LANGUAGE RULE: 
+        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
+        """
+    
+    models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
+    genai.configure(api_key=api_key)
+    
+    last_err = ""
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            last_err = str(e)
+            time.sleep(0.5)
+            continue
+    return f"❌ HATA / ERROR: API Bağlantı Sorunu. Detay: {last_err}"
 
 def get_linkedin_user_urn(access_token):
     access_token = str(access_token).strip()
@@ -550,9 +615,6 @@ def resize_for_instagram(image):
     if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
     return img
 
-# ==============================================================================
-# 🧠 V 128.0 - LAZER KESİM REDAKSİYON (GLOBAL ALT BİLGİ DESTEĞİ)
-# ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
     if not auto_data and not exact_replacements: return pdf_bytes
@@ -560,7 +622,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME
         old_prod = ""
         table_prod_x0 = 150 
         if auto_data:
@@ -578,13 +639,11 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
             except: pass
 
         for page in doc:
-            # 2. LİNK KATİLİ
             try:
                 for link in page.get_links(): 
                     page.delete_link(link)
             except: pass
             
-            # 3. ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
             if auto_data and old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                 new_prod = str(auto_data["ÜRÜN ADI"][1])
                 o_insts = page.search_for(old_prod)
@@ -599,7 +658,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     if fsz < 5: fsz = 8
                     page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 4. SADECE SAYFA 0'A ÖZEL ADRES BLOK OTOMASYONU (Koruma Kalkanlı)
             if page.number == 0 and auto_data:
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
@@ -616,24 +674,24 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             valid_tels.sort(key=lambda t: t.y0)
                             tel = valid_tels[0]
                             
-                            words_pg0 = page.get_text("words")
-                            t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
-                            addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
-                            
-                            addr_y0 = ted.y1 + 2
-                            addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
-                            
-                            if addr_y1 > addr_y0:
-                                rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
-                                page.add_redact_annot(rect, fill=(1,1,1))
-                                page.apply_redactions()
+                            if (tel.y0 - ted.y1) < 150: 
+                                words_pg0 = page.get_text("words")
+                                t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
+                                addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
                                 
-                                y_cursor = addr_y0 + 10
-                                for line in new_add.split('\n'):
-                                    page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
-                                    y_cursor += 12
+                                addr_y0 = ted.y1 + 2
+                                addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
+                                
+                                if addr_y1 > addr_y0:
+                                    rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
+                                    page.add_redact_annot(rect, fill=(1,1,1))
+                                    page.apply_redactions()
+                                    
+                                    y_cursor = addr_y0 + 10
+                                    for line in new_add.split('\n'):
+                                        page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
+                                        y_cursor += 12
 
-            # 5. AKILLI BAŞLIK YAKALAYICI VE LAZER TEMİZLEYİCİ
             if auto_data:
                 words = page.get_text("words")
                 processed_keys = set()
@@ -678,7 +736,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                 final_text = f"{separator}{new_val}"
                                 page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 6. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin)
             if exact_replacements:
                 for item in exact_replacements:
                     if len(item) == 4:
@@ -766,7 +823,6 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                 c.drawImage(logo_img, logo_x, height - logo_y - logo_h, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
             except: pass
             
-        # V 128.0 - Tüm sayfalara eklenecek Alt Bilgi (Footer) Adres Motoru
         if dealer_address:
             try:
                 f_reg = register_embedded_font() or "Helvetica"
