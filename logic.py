@@ -637,7 +637,7 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 126.1 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE HATASIZ LİNK MOTORU)
+# 🧠 V 127.0 - LAZER KESİM REDAKSİYON (BOLD VE MERKEZLEME MOTORU)
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
@@ -648,7 +648,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
         
         # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME (Jilet Hizalama Eksenini Bulmak İçin)
         old_prod = ""
-        table_prod_x0 = 150 # Güvenlik için varsayılan fallback değeri
+        table_prod_x0 = 150 
         if auto_data:
             try:
                 for page in doc:
@@ -659,18 +659,18 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                         if tw:
                             tw.sort(key=lambda x: x[0])
                             old_prod = " ".join([w[4] for w in tw])
-                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası (Kilit Eksenimiz)
+                            table_prod_x0 = tw[0][0] 
                             break
             except: pass
 
         for page in doc:
-            # 2. LİNK KATİLİ (Tıklanabilir mavi E-Mail ve Web Bağlantılarını Kökten Temizle)
+            # 2. LİNK KATİLİ 
             try:
                 for link in page.get_links(): 
                     page.delete_link(link)
             except: pass
             
-            # V 126.1: ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
+            # 3. ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
             if auto_data and old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                 new_prod = str(auto_data["ÜRÜN ADI"][1])
                 o_insts = page.search_for(old_prod)
@@ -685,7 +685,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     if fsz < 5: fsz = 8
                     page.insert_text((inst.x0, inst.y1 - 1.5), new_prod, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 3. SADECE SAYFA 0'A ÖZEL ADRES BLOK OTOMASYONU (Koruma Kalkanı ile)
+            # 4. SADECE SAYFA 0'A ÖZEL ADRES BLOK OTOMASYONU 
             if page.number == 0 and auto_data:
                 if auto_data.get("ADDRESS") and auto_data["ADDRESS"][1]:
                     new_add = auto_data["ADDRESS"][1]
@@ -707,7 +707,6 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
                             
                             addr_y0 = ted.y1 + 2
-                            # V 126.1: Sayfayı tamamen yutmaması için maksimum 60 piksellik silme kalkanı!
                             addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
                             
                             if addr_y1 > addr_y0:
@@ -720,7 +719,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                     page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
                                     y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI VE LAZER TEMİZLEYİCİ (Jilet Hizalama Eklendi)
+            # 5. AKILLI BAŞLIK YAKALAYICI VE LAZER TEMİZLEYİCİ (SDS İÇİN)
             if auto_data:
                 words = page.get_text("words")
                 processed_keys = set()
@@ -740,13 +739,12 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                 min_x = min(w[0] for w in tw)
                                 max_x = max(w[2] for w in tw)
                                 
-                                # V 126.1: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ
                                 if base_key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ", "ACİL DURUM TELEFONU", "ACİL DURUM TEL"]:
-                                    start_x = table_prod_x0 # Sol blok için Ürün Adı referanslı KESİN jilet hizası
+                                    start_x = table_prod_x0 
                                 elif base_key in ["Tel", "Fax", "E-mail", "Web"]:
-                                    start_x = inst.x0 + 40  # Alt sol kolon jilet hizası
+                                    start_x = inst.x0 + 40  
                                 elif base_key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
-                                    start_x = inst.x0 + 95  # Sağ blok jilet hizası
+                                    start_x = inst.x0 + 95  
                                 else:
                                     start_x = inst.x1 + 4
                                 
@@ -766,9 +764,16 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                 final_text = f"{separator}{new_val}"
                                 page.insert_text((start_x, inst.y1 - 1.5), final_text, fontsize=fsz, color=(0,0,0), fontname="helv")
 
-            # 5. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler)
+            # 6. TAM EŞLEŞMELİ DEĞİŞTİRİCİLER (TDS ve Manuel Girdiler İçin Bold ve Center Özellikli)
             if exact_replacements:
-                for old_text, new_text in exact_replacements:
+                for item in exact_replacements:
+                    if len(item) == 4:
+                        old_text, new_text, is_bold, is_center = item
+                    else:
+                        old_text, new_text = item[:2]
+                        is_bold = False
+                        is_center = False
+                        
                     if old_text and new_text and str(old_text).strip() != "" and str(new_text).strip() != "":
                         text_instances = page.search_for(str(old_text))
                         for inst in text_instances:
@@ -778,7 +783,21 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             
                             fsz = (inst.y1 - inst.y0) * 0.75
                             if fsz < 6: fsz = 9
-                            page.insert_text((inst.x0, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname="helv")
+                            
+                            font_to_use = "hebo" if is_bold else "helv"
+                            
+                            if is_center:
+                                try:
+                                    # Metni ortalamak için sayfa genişliğinden metin genişliğini çıkarıp 2'ye bölüyoruz
+                                    font = fitz.Font(font_to_use)
+                                    text_width = font.text_length(str(new_text), fontsize=fsz)
+                                    target_x = (page.rect.width - text_width) / 2
+                                except:
+                                    target_x = inst.x0
+                            else:
+                                target_x = inst.x0
+                                
+                            page.insert_text((target_x, inst.y1 - 1.5), str(new_text), fontsize=fsz, color=(0,0,0), fontname=font_to_use)
 
         output = io.BytesIO()
         doc.save(output)
