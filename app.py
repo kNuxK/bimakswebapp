@@ -370,7 +370,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 126.1 - ACİL TELEFON 16 MADDELİ JİLET EDİTÖR)
+    # F. BAYİ SDS/TDS ÜRETİCİ (V 127.0 - TDS BOLD VE MERKEZLEME)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -398,7 +398,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             exact_replacements = []
             
             if doc_type == "SDS":
-                # V 126.1 - ACİL TELEFON 16 MADDE
                 with st.expander("🧠 Akıllı Belge Düzenleyici (SDS Otonom)", expanded=True):
                     st.caption("Sadece yeni değerleri girin. Sistem eski yazıları bulup hizalarını ve arka plan çizgilerini hiç bozmadan milimetrik olarak yenisiyle değiştirir. Eski değeri bilmenize gerek yoktur!")
                     
@@ -412,19 +411,17 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_chem = st.text_input("5. Kimyasal Adı", placeholder="Örn: TEMİZLEYİCİ")
                         new_sup = st.text_input("6. Tedarikçi Firma", placeholder="Örn: YENİ FİRMA LTD. ŞTİ.")
                         new_add = st.text_area("7. Tedarikçi Adresi", placeholder="Örn: Yeni Mah. Sokak No:1\nİlçe / Şehir", height=68)
-                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                     
                     with c_s2:
+                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                         new_fax = st.text_input("9. Tedarikçi Fax", placeholder="Örn: 0 212 123 45 67")
                         new_mail = st.text_input("10. Tedarikçi Email", placeholder="Örn: info@bayi.com")
                         new_web = st.text_input("11. Tedarikçi Web Adresi", placeholder="Örn: www.bayi.com")
-                        new_emer = st.text_input("12. Acil Durum Telefonu", placeholder="Örn: 112")
-                        new_contact = st.text_input("13. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
-                        new_gbf = st.text_input("14. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
-                        new_cert_date = st.text_input("15. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
-                        new_cert_no = st.text_input("16. Sertifika No", placeholder="Örn: YENİ-NO")
+                        new_contact = st.text_input("12. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
+                        new_gbf = st.text_input("13. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
+                        new_cert_date = st.text_input("14. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
+                        new_cert_no = st.text_input("15. Sertifika No", placeholder="Örn: YENİ-NO")
 
-                    # Motora gönderilecek Lazer Kesim Komutları
                     auto_data = {
                         "ÜRÜN ADI": ("", new_prod),
                         "Oluşturma Tarihi:": (" ", new_cdate),
@@ -443,10 +440,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         "Web:": (" ", new_web),
                         "Web": (": ", new_web),
                         "BAŞVURULACAK KİŞİ": ("", new_contact),
-                        "ACİL DURUM TELEFONU": ("", new_emer),
-                        "ACİL DURUM TEL:": (" ", new_emer),
-                        "ACİL DURUM TEL": ("", new_emer),
-                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_emer),
+                        "ACİL DURUM TELEFONU": ("", new_tel),
+                        "ACİL DURUM TEL:": (" ", new_tel),
+                        "ACİL DURUM TEL": ("", new_tel),
+                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_tel),
                         "GBF Yetkili Kişi:": (" ", new_gbf),
                         "GBF Yetkili Kişi": (": ", new_gbf),
                         "Sertifika Geçerlilik Süresi:": (" ", new_cert_date),
@@ -464,15 +461,19 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         old_tds_prod = st.text_input("Eski Ürün Adı", value="MAKS 400PD")
                         old_tds_type = st.text_input("Eski Ürün Tipi", value="TERS OSMOZ ANTİSKALANTI")
                         old_tds_sup = st.text_input("Eski Tedarikçi", value="BİMAKS")
+                        old_tds_phone = st.text_input("Eski Telefon", value="0 850 522 71 04")
                         
                     with c_t2:
                         new_tds_prod = st.text_input("Yeni Ürün Adı", placeholder="Örn: YENİ ÜRÜN")
                         new_tds_type = st.text_input("Yeni Ürün Tipi", placeholder="Örn: YENİ ANTİSKALANT")
                         new_tds_sup = st.text_input("Yeni Tedarikçi", placeholder="Örn: YENİ FİRMA")
+                        new_tds_phone = st.text_input("Yeni Telefon", placeholder="Örn: 0 555 555 55 55")
                         
-                    if new_tds_prod: exact_replacements.append((old_tds_prod, new_tds_prod))
-                    if new_tds_type: exact_replacements.append((old_tds_type, new_tds_type))
-                    if new_tds_sup: exact_replacements.append((old_tds_sup, new_tds_sup))
+                    # V 127.0 - Tuples ile Bold ve Center bilgisi motora gönderilir (old, new, is_bold, is_center)
+                    if new_tds_prod: exact_replacements.append((old_tds_prod, new_tds_prod, True, True))
+                    if new_tds_type: exact_replacements.append((old_tds_type, new_tds_type, True, True))
+                    if new_tds_sup: exact_replacements.append((old_tds_sup, new_tds_sup, True, False))
+                    if new_tds_phone: exact_replacements.append((old_tds_phone, new_tds_phone, True, False))
 
             with st.expander("🛠️ Gelişmiş Konumlandırma Ayarları (Advanced Positioning)", expanded=False):
                 st.caption("Logonun ve İsteğe Bağlı Beyaz Maskelerin yerini X ve Y olarak ayarlayın.")
@@ -487,9 +488,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 st.markdown("**2. Alt Beyaz Maske (Kapatmak isterseniz)**")
                 cb1, cb2, cb3, cb4 = st.columns(4)
                 bot_mask_x = cb1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_bm_x")
-                bot_mask_y = cb2.slider("Y (Yukarı-Aşağı)", 500, 842, 842, key=f"{doc_type}_bm_y")
+                # V 127.0 - Maske görünür olsun diye default ayarlar 842'den 786'ya çekildi.
+                bot_mask_y = cb2.slider("Y (Yukarı-Aşağı)", 500, 842, 786, key=f"{doc_type}_bm_y")
                 bot_mask_w = cb3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_bm_w")
-                bot_mask_h = cb4.slider("Yükseklik", 0, 300, 0, key=f"{doc_type}_bm_h")
+                bot_mask_h = cb4.slider("Yükseklik", 0, 300, 56, key=f"{doc_type}_bm_h")
                 
                 st.markdown("**3. Yeni Logo Konumu**")
                 c_l1, c_l2, c_l3 = st.columns(3)
