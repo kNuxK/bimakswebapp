@@ -313,10 +313,13 @@ def force_clean_text(text):
 def smart_trim(text, limit):
     return text
 
+# --- GEMINI API ---
 def get_gemini_response_from_manual(full_prompt, api_key):
     if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
+    
     models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro']
     genai.configure(api_key=api_key)
+    
     last_err = ""
     for model_name in models_to_try:
         try:
@@ -328,8 +331,10 @@ def get_gemini_response_from_manual(full_prompt, api_key):
             last_err = str(e)
             time.sleep(0.5) 
             continue
+            
     return f"❌ HATA / ERROR: {last_err}"
 
+# --- GERÇEK LINKEDIN API ENTEGRASYONU ---
 def get_linkedin_user_urn(access_token):
     access_token = str(access_token).strip()
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -366,11 +371,14 @@ def register_upload_image(access_token, person_urn):
 
 def post_to_linkedin_real(text, media_bytes, media_type, access_token):
     if not access_token: return "❌ HATA: LinkedIn Token girilmemiş."
+    
     access_token = str(access_token).strip()
     person_id = get_linkedin_user_urn(access_token)
     if not person_id: return "❌ HATA: Token geçersiz veya erişim izni yok."
     person_urn = f"urn:li:person:{person_id}"
+    
     asset_urn = None
+    
     if media_bytes and "image" in media_type:
         upload_url, asset = register_upload_image(access_token, person_id)
         if upload_url:
@@ -381,23 +389,43 @@ def post_to_linkedin_real(text, media_bytes, media_type, access_token):
                 else: return f"❌ HATA: Resim yüklenemedi. Kod: {put_resp.status_code}"
             except Exception as e: return f"❌ HATA: Resim upload sorunu: {str(e)}"
         else: return "❌ HATA: Resim kaydı başarısız."
+
     post_url = "https://api.linkedin.com/v2/ugcPosts"
     headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json', 'X-Restli-Protocol-Version': '2.0.0'}
-    share_content = {"shareCommentary": {"text": text}, "shareMediaCategory": "NONE"}
+    
+    share_content = {
+        "shareCommentary": {"text": text},
+        "shareMediaCategory": "NONE"
+    }
+    
     if asset_urn:
         share_content["shareMediaCategory"] = "IMAGE"
-        share_content["media"] = [{"status": "READY", "description": {"text": "Bimaks App Auto Post"}, "media": asset_urn, "title": {"text": "Bimaks Visual"}}]
+        share_content["media"] = [{
+            "status": "READY",
+            "description": {"text": "Bimaks App Auto Post"},
+            "media": asset_urn,
+            "title": {"text": "Bimaks Visual"}
+        }]
+        
     payload = {
-        "author": person_urn, "lifecycleState": "PUBLISHED",
-        "specificContent": {"com.linkedin.ugc.ShareContent": share_content},
+        "author": person_urn,
+        "lifecycleState": "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": share_content
+        },
         "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
     }
+    
     try:
         response = requests.post(post_url, headers=headers, json=payload)
-        if response.status_code in [200, 201]: return "✅ BAŞARILI: Paylaşım LinkedIn'de yayında!"
-        else: return f"❌ HATA: LinkedIn reddetti. Kod: {response.status_code} - Mesaj: {response.text}"
-    except Exception as e: return f"❌ HATA: Bağlantı sorunu: {str(e)}"
+        if response.status_code in [200, 201]:
+            return "✅ BAŞARILI: Paylaşım LinkedIn'de yayında!"
+        else:
+            return f"❌ HATA: LinkedIn reddetti. Kod: {response.status_code} - Mesaj: {response.text}"
+    except Exception as e:
+        return f"❌ HATA: Bağlantı sorunu: {str(e)}"
 
+# --- GELİŞMİŞ ROI HESAPLAMA ---
 def calculate_advanced_roi(blowdown_curr, hours, coc_curr, coc_target, water_cost, energy_bill_total, scale_mm, chem_cost):
     try:
         coc_curr = float(coc_curr)
@@ -409,12 +437,16 @@ def calculate_advanced_roi(blowdown_curr, hours, coc_curr, coc_target, water_cos
         scale_loss_ratio = min(float(scale_mm) * 0.10, 0.50) 
         energy_saved = float(energy_bill_total) * scale_loss_ratio
         return {
-            "w_curr": float(blowdown_curr) * float(hours), "w_new": blowdown_new * float(hours),
-            "w_save": water_saved_total, "w_money": water_saved_total * float(water_cost),
-            "e_save": energy_saved, "total_gain": (water_saved_total * float(water_cost)) + energy_saved - float(chem_cost)
+            "w_curr": float(blowdown_curr) * float(hours),
+            "w_new": blowdown_new * float(hours),
+            "w_save": water_saved_total,
+            "w_money": water_saved_total * float(water_cost),
+            "e_save": energy_saved,
+            "total_gain": (water_saved_total * float(water_cost)) + energy_saved - float(chem_cost)
         }
     except: return None
 
+# --- OCR VE GÖRSEL ANALİZ ---
 def analyze_image_with_gemini(image_bytes, prompt_text, api_key):
     if not api_key: return "❌ API Key Missing."
     models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
@@ -428,6 +460,7 @@ def analyze_image_with_gemini(image_bytes, prompt_text, api_key):
         except: continue
     return "❌ OCR Error."
 
+# --- LSI HESAPLAMA ---
 def calculate_lsi(ph, tds, temp_c, ca_hard, alk):
     try:
         ph, tds, temp_c, ca_hard, alk = float(ph), float(tds), float(temp_c), float(ca_hard), float(alk)
@@ -439,24 +472,42 @@ def calculate_lsi(ph, tds, temp_c, ca_hard, alk):
         return ph - pHs, 2 * pHs - ph
     except: return None, None
 
+# --- PROMPT MİMARİSİ ---
 def construct_prompt_text(role, topic, audience, platform, product, limit, lang_code, product_link=None):
     lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
     lang_name = lang_dict['name']
     detail_lbl = lang_dict.get('detail_info', 'Detaylı Bilgi:')
+    
     safe_word_limit = int((limit * 0.90) / 6.5)
-    product_instruction = f"- 🧪 PRODUCT INTEGRATION: In your solution section, briefly explain why '{product}' should be used and how it technically solves the discussed problem." if product and str(product).strip() and str(product).strip() != "..." else "- 🧪 NO PRODUCT: Focus entirely on the technical methodology. Do not mention or promote any commercial products."
-    link_instruction = f"- 🔗 CONCLUSION: End the article with a strong technical summary, then on the absolute final line add exactly this text (DO NOT translate this line):\n{detail_lbl} {product_link}" if product_link and str(product_link).strip() else "- 🚀 CONCLUSION: End the article with a strong technical summary. Stop writing immediately after the summary."
+
+    product_instruction = ""
+    link_instruction = ""
+
+    if product and str(product).strip() and str(product).strip() != "...":
+        product_instruction = f"- 🧪 PRODUCT INTEGRATION: In your solution section, briefly explain why '{product}' should be used and how it technically solves the discussed problem."
+    else:
+        product_instruction = "- 🧪 NO PRODUCT: Focus entirely on the technical methodology. Do not mention or promote any commercial products."
+
+    if product_link and str(product_link).strip():
+        link_instruction = f"- 🔗 CONCLUSION: End the article with a strong technical summary, then on the absolute final line add exactly this text (DO NOT translate this line):\n{detail_lbl} {product_link}"
+    else:
+        link_instruction = "- 🚀 CONCLUSION: End the article with a strong technical summary. Stop writing immediately after the summary."
 
     prompt = f"""
     [CRITICAL SYSTEM COMMAND: YOUR ENTIRE OUTPUT MUST BE EXCLUSIVELY WRITTEN IN {lang_name.upper()}!]
+
     ACT AS: A World-Class '{role}' and industry thought leader with 20+ years of hands-on engineering, operational, and technical experience.
+    
     MISSION: Write a highly authoritative, deeply technical, and viral professional article.
     TOPIC TO WRITE ABOUT: '{topic}' (IGNORE the language of this topic. You MUST write the article in {lang_name.upper()}).
+    
     TARGET AUDIENCE: {audience}. Assume the audience consists of plant managers, technical directors, engineers, and industry professionals. Do NOT speak to them like beginners.
     PLATFORM: {platform}.
+    
     CRITICAL LANGUAGE RULE (MUTLAK İTAAT): 
     The requested topic or product name might be given to you in Turkish, English, or another language. YOU MUST COMPLETELY IGNORE THE INPUT LANGUAGE. 
     You MUST output your ENTIRE final response strictly, fluently, and natively in {lang_name.upper()}. Do not mix languages. TRANSLATE all your thoughts into {lang_name.upper()} before generating the text.
+    
     STRICT CONSTRAINTS & TONE:
     1. AVOID FLUFF: Absolutely NO generic motivational phrases, superficial business jargon, or cliché introductions. Get straight to the technical reality, root causes, and scientific/engineering facts.
     2. SAFE LENGTH LIMIT: You are strictly limited to a MAXIMUM of {safe_word_limit} words. Your entire response must easily fit within {limit} characters. Do NOT write long essays. Keep it extremely concise, punchy, and highly informative.
@@ -494,8 +545,10 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
     
     is_pdf_template = False
     template_bytes = st.session_state.get('template_data')
+    
     if template_bytes:
-        if isinstance(template_bytes, bytes) and b'%PDF' in template_bytes[:50]: is_pdf_template = True
+        if isinstance(template_bytes, bytes) and b'%PDF' in template_bytes[:50]:
+            is_pdf_template = True
         else:
             try: c.drawImage(ImageReader(io.BytesIO(template_bytes)), 0, 0, width=width, height=height)
             except: pass
@@ -511,35 +564,68 @@ def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, c
     c.drawString(350, start_y - 35, f"{t('q_payment')} {payment}")
     
     y = start_y - 120; c.line(40, y+15, 560, y+15); c.setFont(f_reg, 9)
+    
     amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة", "FR":"Emballage", "ES":"Paquete"}.get(lang_code, "Ambalaj")
+    
     c.drawString(40, y, t('q_prod_name')); c.drawString(220, y, amb_text); c.drawString(450, y, f"{t('q_price')} ({currency})")
     
     y -= 20; grand_total = 0
     for it in items:
         try:
-            p = float(it.get('price', 0)); q = float(it.get('qty', 1)); line_total = p * q; grand_total += line_total
-            name_text = str(it.get('name', '')); wrapped_name = textwrap.wrap(name_text, width=35) 
+            p = float(it.get('price', 0))
+            q = float(it.get('qty', 1))
+            line_total = p * q
+            grand_total += line_total
+            
+            name_text = str(it.get('name', ''))
+            wrapped_name = textwrap.wrap(name_text, width=35) 
             if not wrapped_name: wrapped_name = [""]
-            c.drawString(40, y, wrapped_name[0]); c.drawString(220, y, str(it.get('pkg', ''))[:15]); c.drawString(450, y, f"{p:,.2f}"); y -= 15
+            
+            c.drawString(40, y, wrapped_name[0])
+            c.drawString(220, y, str(it.get('pkg', ''))[:15])
+            c.drawString(450, y, f"{p:,.2f}")
+            y -= 15
+            
             if len(wrapped_name) > 1:
-                for extra_line in wrapped_name[1:]: c.drawString(40, y, extra_line); y -= 15
+                for extra_line in wrapped_name[1:]:
+                    c.drawString(40, y, extra_line)
+                    y -= 15
+                    
             y -= 5 
         except: continue
     
     if show_total: 
-        c.setFont(f_reg, 11); c.line(40, y, 560, y); c.drawString(350, y-20, f"{t('q_total')}: {grand_total:,.2f} {currency}")
+        c.setFont(f_reg, 11); c.line(40, y, 560, y)
+        c.drawString(350, y-20, f"{t('q_total')}: {grand_total:,.2f} {currency}")
     
-    bank_y = 100; c.setFont(f_reg, 9); c.drawString(50, bank_y, t('q_bank_lbl')); c.drawString(140, bank_y, bank_info.replace('\n', ' | '))
+    bank_y = 100; c.setFont(f_reg, 9); c.drawString(50, bank_y, t('q_bank_lbl'))
+    c.drawString(140, bank_y, bank_info.replace('\n', ' | '))
+    
     c.save(); buffer.seek(0)
     
     if is_pdf_template and HAS_PYPDF:
         try:
-            text_pdf = PdfReader(buffer); template_pdf = PdfReader(io.BytesIO(template_bytes)); writer = PdfWriter()
-            template_page = template_pdf.pages[0]; text_page = text_pdf.pages[0]
-            if hasattr(template_page, "merge_page"): template_page.merge_page(text_page)
-            elif hasattr(template_page, "mergePage"): template_page.mergePage(text_page)
-            writer.add_page(template_page); merged_buffer = io.BytesIO(); writer.write(merged_buffer); merged_buffer.seek(0); return merged_buffer
-        except Exception as e: return buffer
+            text_pdf = PdfReader(buffer)
+            template_pdf = PdfReader(io.BytesIO(template_bytes))
+            writer = PdfWriter()
+            
+            template_page = template_pdf.pages[0]
+            text_page = text_pdf.pages[0]
+            
+            if hasattr(template_page, "merge_page"):
+                template_page.merge_page(text_page)
+            elif hasattr(template_page, "mergePage"):
+                template_page.mergePage(text_page)
+                
+            writer.add_page(template_page)
+            
+            merged_buffer = io.BytesIO()
+            writer.write(merged_buffer)
+            merged_buffer.seek(0)
+            return merged_buffer
+        except Exception as e:
+            return buffer
+            
     return buffer
 
 def resize_for_instagram(image):
@@ -551,7 +637,7 @@ def resize_for_instagram(image):
     return img
 
 # ==============================================================================
-# 🧠 V 126.0 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE HATASIZ LİNK MOTORU)
+# 🧠 V 126.1 - LAZER KESİM REDAKSİYON (JİLET HİZALAMA VE HATASIZ LİNK MOTORU)
 # ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
@@ -560,8 +646,9 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME
+        # 1. ESKİ ÜRÜN ADINI OTOMATİK ÖĞRENME (Jilet Hizalama Eksenini Bulmak İçin)
         old_prod = ""
+        table_prod_x0 = 150 # Güvenlik için varsayılan fallback değeri
         if auto_data:
             try:
                 for page in doc:
@@ -572,6 +659,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                         if tw:
                             tw.sort(key=lambda x: x[0])
                             old_prod = " ".join([w[4] for w in tw])
+                            table_prod_x0 = tw[0][0] # Orijinal Ürün Adının X başlangıç noktası (Kilit Eksenimiz)
                             break
             except: pass
 
@@ -582,7 +670,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                     page.delete_link(link)
             except: pass
             
-            # V 126.0: ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
+            # V 126.1: ÜRÜN ADI - GLOBAL DEĞİŞTİRİCİ
             if auto_data and old_prod and auto_data.get("ÜRÜN ADI") and auto_data["ÜRÜN ADI"][1]:
                 new_prod = str(auto_data["ÜRÜN ADI"][1])
                 o_insts = page.search_for(old_prod)
@@ -619,7 +707,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
                             
                             addr_y0 = ted.y1 + 2
-                            # V 126.0: Sayfayı tamamen yutmaması için maksimum 60 piksellik silme kalkanı!
+                            # V 126.1: Sayfayı tamamen yutmaması için maksimum 60 piksellik silme kalkanı!
                             addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
                             
                             if addr_y1 > addr_y0:
@@ -632,7 +720,7 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                     page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
                                     y_cursor += 12
 
-            # 4. AKILLI BAŞLIK YAKALAYICI VE LAZER TEMİZLEYİCİ (Çift yazmayı engelleyen kalkan eklendi)
+            # 4. AKILLI BAŞLIK YAKALAYICI VE LAZER TEMİZLEYİCİ (Jilet Hizalama Eklendi)
             if auto_data:
                 words = page.get_text("words")
                 processed_keys = set()
@@ -652,13 +740,13 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                                 min_x = min(w[0] for w in tw)
                                 max_x = max(w[2] for w in tw)
                                 
-                                # V 126.0: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ
+                                # V 126.1: JİLET GİBİ DÜMDÜZ HİZALAMA EKSENLERİ
                                 if base_key in ["KİMYASAL ADI", "TEDARİKÇİ", "BAŞVURULACAK KİŞİ", "ACİL DURUM TELEFONU", "ACİL DURUM TEL"]:
-                                    start_x = inst.x0 + 120 # Sol blok için jilet hizası
+                                    start_x = table_prod_x0 # Sol blok için Ürün Adı referanslı KESİN jilet hizası
                                 elif base_key in ["Tel", "Fax", "E-mail", "Web"]:
                                     start_x = inst.x0 + 40  # Alt sol kolon jilet hizası
                                 elif base_key in ["Oluşturma Tarihi", "Revizyon Tarihi", "Versiyon"]:
-                                    start_x = inst.x0 + 90  # Sağ blok jilet hizası
+                                    start_x = inst.x0 + 95  # Sağ blok jilet hizası
                                 else:
                                     start_x = inst.x1 + 4
                                 
