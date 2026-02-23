@@ -264,7 +264,7 @@ def delete_user(target_username):
         return False, f"Silme hatası: {str(e)}"
 
 # ==============================================================================
-# 🧠 MANTIK
+# 🧠 MANTIK VE PDF TEMEL MOTORLARI
 # ==============================================================================
 
 def apply_theme():
@@ -330,147 +330,6 @@ def get_gemini_response_from_manual(full_prompt, api_key):
             continue
     return f"❌ HATA / ERROR: {last_err}"
 
-# ==============================================================================
-# 🧠 V 130.0 - AI SIFIRDAN BELGE ÜRETİM MOTORU VE OTONOM PDF ÇİZİCİ
-# ==============================================================================
-def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code):
-    if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
-    lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
-    lang_name = lang_dict.get('name', 'Turkish')
-    
-    if "SDS" in doc_type:
-        prompt = f"""
-        ACT AS: A Senior Chemical Regulatory Expert and Toxicologist.
-        MISSION: Generate a comprehensive 16-section Safety Data Sheet (SDS / GBF) according to GHS/CLP and REACH regulations based on the provided recipe.
-        
-        PRODUCT NAME: {product_name}
-        PRODUCT INTENDED USE: {product_type}
-        INGREDIENTS & COMPOSITION:
-        {ingredients}
-        
-        REQUIREMENTS:
-        1. Calculate or estimate the hazard classifications (H-codes, P-codes) based on the chemistry of the ingredients.
-        2. Determine the appropriate UN Number and transport class for Section 14.
-        3. Provide realistic first aid, firefighting, and handling measures.
-        4. Structure the output strictly into the standard 16 SDS sections.
-        5. Use simple Markdown formatting.
-        
-        CRITICAL LANGUAGE RULE: 
-        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
-        """
-    else:
-        prompt = f"""
-        ACT AS: A Senior Chemical Engineer and Product Manager.
-        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product recipe.
-        
-        PRODUCT NAME: {product_name}
-        PRODUCT INTENDED USE: {product_type}
-        INGREDIENTS & COMPOSITION (Use this context to write the TDS, but DO NOT expose exact secret percentages in the public text):
-        {ingredients}
-        
-        REQUIREMENTS:
-        1. Provide a strong 'Product Description' (Ürün Tanımı).
-        2. List 'Application Areas' (Kullanım Alanları).
-        3. List 'Features & Benefits' (Özellikleri ve Avantajları) based on the active ingredients.
-        4. Suggest 'Application & Dosage' (Kullanım Şekli ve Miktarı) instructions for industrial use.
-        5. Provide a 'Physical Properties' table (estimate pH, appearance, density based on ingredients).
-        6. Use simple Markdown formatting.
-        
-        CRITICAL LANGUAGE RULE: 
-        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
-        """
-    
-    models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
-    genai.configure(api_key=api_key)
-    
-    last_err = ""
-    for model_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            last_err = str(e)
-            time.sleep(0.5)
-            continue
-    return f"❌ HATA / ERROR: API Bağlantı Sorunu. Detay: {last_err}"
-
-def create_generated_document_pdf(text_content, logo_bytes, footer_text, lang_code):
-    if not HAS_REPORTLAB: return None
-    buffer = io.BytesIO()
-    width, height = A4
-    c = canvas.Canvas(buffer, pagesize=A4)
-    font_name = register_embedded_font() or "Helvetica"
-    
-    def draw_bg(canvas_obj, page_num):
-        # Üst Logo Çizimi
-        if logo_bytes:
-            try:
-                logo_img = ImageReader(io.BytesIO(logo_bytes))
-                pil_img = Image.open(io.BytesIO(logo_bytes))
-                aspect = pil_img.height / float(pil_img.width)
-                w = 120
-                h = w * aspect
-                if h > 60:
-                    h = 60
-                    w = h / aspect
-                canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
-            except: pass
-        
-        # Çizgiler
-        canvas_obj.setStrokeColorRGB(0.8, 0.8, 0.8)
-        canvas_obj.line(40, height - 90, width - 40, height - 90)
-        canvas_obj.line(40, 70, width - 40, 70)
-        
-        # Alt Bilgi (Footer) Çizimi
-        if footer_text:
-            canvas_obj.setFont(font_name, 8)
-            canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
-            lines = footer_text.split('\n')
-            y_start = 55
-            for l in lines:
-                canvas_obj.drawCentredString(width / 2.0, y_start, l.strip())
-                y_start -= 10
-        
-        # Sayfa Numarası
-        canvas_obj.drawRightString(width - 40, 55, f"Sayfa {page_num}")
-        canvas_obj.setFillColorRGB(0, 0, 0)
-    
-    page_num = 1
-    draw_bg(c, page_num)
-    text_y = height - 110
-    
-    for p in text_content.split('\n'):
-        # Markdown sembollerini temizle
-        p = p.replace('**', '').replace('*', '').strip()
-        is_header = p.startswith('#')
-        
-        if is_header:
-            p = p.replace('#', '').strip()
-            c.setFont(font_name, 12)
-        else:
-            c.setFont(font_name, 9)
-            
-        wrapped = textwrap.wrap(p, width=100) if p else [""]
-        
-        for wl in wrapped:
-            if text_y < 90:
-                c.showPage()
-                page_num += 1
-                draw_bg(c, page_num)
-                text_y = height - 110
-                c.setFont(font_name, 12 if is_header else 9)
-                
-            c.drawString(40, text_y, wl)
-            text_y -= 14
-        text_y -= 6 # Paragraf arası boşluk
-            
-    c.save()
-    buffer.seek(0)
-    return buffer.getvalue()
-
-# --- DİĞER FONKSİYONLAR ---
 def get_linkedin_user_urn(access_token):
     access_token = str(access_token).strip()
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -612,6 +471,241 @@ def construct_prompt_text(role, topic, audience, platform, product, limit, lang_
     """
     return prompt.strip()
 
+# --- V 130.1: EKSİK KALAN FONT FONKSİYONU GERİ YÜKLENDİ ---
+def register_embedded_font():
+    font_path = "DejaVuSans.ttf"
+    if not os.path.exists(font_path):
+        try:
+            url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                with open(font_path, "wb") as f: f.write(r.content)
+        except: return None
+    if os.path.exists(font_path):
+        try: pdfmetrics.registerFont(TTFont('TrFont', font_path)); return "TrFont"
+        except: return None
+    return None
+
+# --- V 130.1: EKSİK KALAN TEKLİF PDF MOTORU GERİ YÜKLENDİ ---
+def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, currency, show_total, custom_note, lang_code):
+    if not HAS_REPORTLAB: return None
+    t = lambda k: config.LANGUAGES.get(lang_code, config.LANGUAGES['TR']).get(k, k)
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4); width, height = A4
+    f_reg = register_embedded_font() or "Helvetica"
+    
+    is_pdf_template = False
+    template_bytes = st.session_state.get('template_data')
+    if template_bytes:
+        if isinstance(template_bytes, bytes) and b'%PDF' in template_bytes[:50]: is_pdf_template = True
+        else:
+            try: c.drawImage(ImageReader(io.BytesIO(template_bytes)), 0, 0, width=width, height=height)
+            except: pass
+
+    start_y = height - 190
+    c.setFont(f_reg, 10); c.drawString(50, start_y, t('q_invoice_info'))
+    txt = c.beginText(50, start_y - 15); txt.setFont(f_reg, 10)
+    for l in invoice_info.split('\n'): txt.textLine(l[:50])
+    c.drawText(txt)
+    
+    c.setFont(f_reg, 10); c.drawString(350, start_y, f"{t('q_date')}: {datetime.now().strftime('%d.%m.%Y')}")
+    c.drawString(350, start_y - 20, f"{t('q_period')} {period}")
+    c.drawString(350, start_y - 35, f"{t('q_payment')} {payment}")
+    
+    y = start_y - 120; c.line(40, y+15, 560, y+15); c.setFont(f_reg, 9)
+    amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة", "FR":"Emballage", "ES":"Paquete"}.get(lang_code, "Ambalaj")
+    c.drawString(40, y, t('q_prod_name')); c.drawString(220, y, amb_text); c.drawString(450, y, f"{t('q_price')} ({currency})")
+    
+    y -= 20; grand_total = 0
+    for it in items:
+        try:
+            p = float(it.get('price', 0)); q = float(it.get('qty', 1)); line_total = p * q; grand_total += line_total
+            name_text = str(it.get('name', '')); wrapped_name = textwrap.wrap(name_text, width=35) 
+            if not wrapped_name: wrapped_name = [""]
+            c.drawString(40, y, wrapped_name[0]); c.drawString(220, y, str(it.get('pkg', ''))[:15]); c.drawString(450, y, f"{p:,.2f}"); y -= 15
+            if len(wrapped_name) > 1:
+                for extra_line in wrapped_name[1:]: c.drawString(40, y, extra_line); y -= 15
+            y -= 5 
+        except: continue
+    
+    if show_total: 
+        c.setFont(f_reg, 11); c.line(40, y, 560, y); c.drawString(350, y-20, f"{t('q_total')}: {grand_total:,.2f} {currency}")
+    
+    bank_y = 100; c.setFont(f_reg, 9); c.drawString(50, bank_y, t('q_bank_lbl')); c.drawString(140, bank_y, bank_info.replace('\n', ' | '))
+    c.save(); buffer.seek(0)
+    
+    if is_pdf_template and HAS_PYPDF:
+        try:
+            text_pdf = PdfReader(buffer); template_pdf = PdfReader(io.BytesIO(template_bytes)); writer = PdfWriter()
+            template_page = template_pdf.pages[0]; text_page = text_pdf.pages[0]
+            if hasattr(template_page, "merge_page"): template_page.merge_page(text_page)
+            elif hasattr(template_page, "mergePage"): template_page.mergePage(text_page)
+            writer.add_page(template_page); merged_buffer = io.BytesIO(); writer.write(merged_buffer); merged_buffer.seek(0); return merged_buffer
+        except Exception as e: return buffer
+    return buffer
+
+def resize_for_instagram(image):
+    base_width = 1080
+    w_percent = (base_width / float(image.size[0]))
+    h_size = int((float(image.size[1]) * float(w_percent)))
+    img = image.resize((base_width, h_size), Image.Resampling.LANCZOS)
+    if h_size > 1350: img = img.crop((0, (h_size-1350)/2, 1080, (h_size+1350)/2))
+    return img
+
+# ==============================================================================
+# 🧠 V 130.1 - AI SIFIRDAN BELGE ÜRETİM MOTORU VE OTONOM PDF ÇİZİCİ
+# ==============================================================================
+def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code):
+    if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
+    lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
+    lang_name = lang_dict.get('name', 'Turkish')
+    
+    if "SDS" in doc_type:
+        prompt = f"""
+        ACT AS: A Senior Chemical Regulatory Expert and Toxicologist.
+        MISSION: Generate a comprehensive 16-section Safety Data Sheet (SDS / GBF) according to GHS/CLP and REACH regulations based on the provided recipe.
+        
+        PRODUCT NAME: {product_name}
+        PRODUCT INTENDED USE: {product_type}
+        INGREDIENTS & COMPOSITION:
+        {ingredients}
+        
+        REQUIREMENTS:
+        1. Calculate or estimate the hazard classifications (H-codes, P-codes) based on the chemistry of the ingredients.
+        2. Determine the appropriate UN Number and transport class for Section 14.
+        3. Provide realistic first aid, firefighting, and handling measures.
+        4. Structure the output strictly into the standard 16 SDS sections.
+        5. Use simple Markdown formatting.
+        
+        CRITICAL LANGUAGE RULE: 
+        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
+        """
+    else:
+        prompt = f"""
+        ACT AS: A Senior Chemical Engineer and Product Manager.
+        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product recipe.
+        
+        PRODUCT NAME: {product_name}
+        PRODUCT INTENDED USE: {product_type}
+        INGREDIENTS & COMPOSITION (Use this context to write the TDS, but DO NOT expose exact secret percentages in the public text):
+        {ingredients}
+        
+        REQUIREMENTS:
+        1. Provide a strong 'Product Description' (Ürün Tanımı).
+        2. List 'Application Areas' (Kullanım Alanları).
+        3. List 'Features & Benefits' (Özellikleri ve Avantajları) based on the active ingredients.
+        4. Suggest 'Application & Dosage' (Kullanım Şekli ve Miktarı) instructions for industrial use.
+        5. Provide a 'Physical Properties' table (estimate pH, appearance, density based on ingredients).
+        6. Use simple Markdown formatting.
+        
+        CRITICAL LANGUAGE RULE: 
+        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
+        """
+    
+    models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
+    genai.configure(api_key=api_key)
+    
+    last_err = ""
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            last_err = str(e)
+            time.sleep(0.5)
+            continue
+    return f"❌ HATA / ERROR: API Bağlantı Sorunu. Detay: {last_err}"
+
+def create_generated_document_pdf(text_content, logo_bytes, footer_text, lang_code):
+    if not HAS_REPORTLAB: return None
+    buffer = io.BytesIO()
+    width, height = A4
+    c = canvas.Canvas(buffer, pagesize=A4)
+    font_name = register_embedded_font() or "Helvetica"
+    
+    def draw_bg(canvas_obj, page_num):
+        # 1. Üst Logo Çizimi
+        if logo_bytes:
+            try:
+                logo_img = ImageReader(io.BytesIO(logo_bytes))
+                pil_img = Image.open(io.BytesIO(logo_bytes))
+                aspect = pil_img.height / float(pil_img.width)
+                w = 120
+                h = w * aspect
+                if h > 50:
+                    h = 50
+                    w = h / aspect
+                canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
+            except: pass
+        
+        # 2. Üst ve Alt Çizgiler (Tasarım Şablonu)
+        canvas_obj.setStrokeColorRGB(0.7, 0.7, 0.7)
+        canvas_obj.setLineWidth(1)
+        canvas_obj.line(40, height - 80, width - 40, height - 80) # Header çizgisi
+        canvas_obj.line(40, 60, width - 40, 60) # Footer çizgisi
+        
+        # 3. Alt Bilgi (Footer) Çizimi - Sola Dayalı Tedarikçi Adresi
+        if footer_text:
+            canvas_obj.setFont(font_name, 8)
+            canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
+            lines = footer_text.split('\n')
+            y_start = 48
+            for l in lines:
+                canvas_obj.drawString(40, y_start, l.strip()[:150])
+                y_start -= 10
+        
+        # 4. Sayfa Numarası - Sağa Dayalı
+        canvas_obj.setFont(font_name, 8)
+        canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
+        canvas_obj.drawRightString(width - 40, 48, f"Sayfa {page_num}")
+        canvas_obj.setFillColorRGB(0, 0, 0)
+    
+    page_num = 1
+    draw_bg(c, page_num)
+    text_y = height - 110
+    
+    for p in text_content.split('\n'):
+        p = p.strip()
+        if not p:
+            text_y -= 8
+            continue
+            
+        is_header = p.startswith('#')
+        is_bold = p.startswith('**') or p.startswith('- **')
+        
+        # Markdown Sembol Temizliği
+        clean_p = p.replace('#', '').replace('**', '').replace('*', '').strip()
+        
+        if is_header:
+            c.setFont(font_name, 12)
+            text_y -= 6
+        else:
+            c.setFont(font_name, 9)
+            
+        wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
+        
+        for wl in wrapped:
+            if text_y < 85: # Sayfa sonu kalkanı
+                c.showPage()
+                page_num += 1
+                draw_bg(c, page_num)
+                text_y = height - 110
+                c.setFont(font_name, 12 if is_header else 9)
+                
+            c.drawString(40, text_y, wl)
+            text_y -= 12
+        text_y -= 4 
+            
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+# ==============================================================================
+# 🧠 SDS/TDS DEĞİŞTİRME VE MASKELEME MOTORLARI
+# ==============================================================================
 def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
     if not HAS_PYMUPDF or not pdf_bytes: return pdf_bytes
     if not auto_data and not exact_replacements: return pdf_bytes
@@ -671,22 +765,23 @@ def replace_text_in_pdf_bytes(pdf_bytes, auto_data, exact_replacements=None):
                             valid_tels.sort(key=lambda t: t.y0)
                             tel = valid_tels[0]
                             
-                            words_pg0 = page.get_text("words")
-                            t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
-                            addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
-                            
-                            addr_y0 = ted.y1 + 2
-                            addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
-                            
-                            if addr_y1 > addr_y0:
-                                rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
-                                page.add_redact_annot(rect, fill=(1,1,1))
-                                page.apply_redactions()
+                            if (tel.y0 - ted.y1) < 150: 
+                                words_pg0 = page.get_text("words")
+                                t_words = [w for w in words_pg0 if w[1] < ted.y1+3 and w[3] > ted.y0-3 and w[0] >= ted.x1-2]
+                                addr_x = min(w[0] for w in t_words) if t_words else ted.x1 + 10
                                 
-                                y_cursor = addr_y0 + 10
-                                for line in new_add.split('\n'):
-                                    page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
-                                    y_cursor += 12
+                                addr_y0 = ted.y1 + 2
+                                addr_y1 = min(tel.y0 - 2, addr_y0 + 60)
+                                
+                                if addr_y1 > addr_y0:
+                                    rect = fitz.Rect(addr_x - 2, addr_y0, page.rect.width - 20, addr_y1)
+                                    page.add_redact_annot(rect, fill=(1,1,1))
+                                    page.apply_redactions()
+                                    
+                                    y_cursor = addr_y0 + 10
+                                    for line in new_add.split('\n'):
+                                        page.insert_text((addr_x, y_cursor), line.strip(), fontsize=9, color=(0,0,0), fontname="helv")
+                                        y_cursor += 12
 
             if auto_data:
                 words = page.get_text("words")
@@ -782,12 +877,16 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                       logo_x, logo_y, logo_w, addr_x, addr_y, lang_code, 
                       auto_data=None, exact_replacements=None):
     if not HAS_PYPDF or not HAS_REPORTLAB: return None
+    
     if auto_data or exact_replacements:
         original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data, exact_replacements)
+        
     try:
         original_pdf = PdfReader(io.BytesIO(original_pdf_bytes))
         writer = PdfWriter()
+        
         packet = io.BytesIO()
+        
         width, height = 595.27, 841.89
         try:
             first_page = original_pdf.pages[0] if hasattr(original_pdf, "pages") else original_pdf.getPage(0)
@@ -795,6 +894,7 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             width = float(mbox.width) if hasattr(mbox, "width") else (float(mbox.getWidth()) if hasattr(mbox, "getWidth") else float(mbox[2]))
             height = float(mbox.height) if hasattr(mbox, "height") else (float(mbox.getHeight()) if hasattr(mbox, "getHeight") else float(mbox[3]))
         except: pass
+            
         c = canvas.Canvas(packet, pagesize=(width, height))
         
         if top_mask_h > 0 and top_mask_w > 0:
@@ -831,9 +931,12 @@ def create_dealer_pdf(original_pdf_bytes, dealer_logo_bytes, dealer_address,
         overlay_page = overlay_pdf.pages[0] if hasattr(overlay_pdf, "pages") else overlay_pdf.getPage(0)
         
         pages_list = original_pdf.pages if hasattr(original_pdf, "pages") else [original_pdf.getPage(i) for i in range(original_pdf.getNumPages())]
+        
         for page in pages_list:
-            if hasattr(page, "merge_page"): page.merge_page(overlay_page)
-            elif hasattr(page, "mergePage"): page.mergePage(overlay_page)
+            if hasattr(page, "merge_page"):
+                page.merge_page(overlay_page)
+            elif hasattr(page, "mergePage"):
+                page.mergePage(overlay_page)
             writer.add_page(page)
             
         output = io.BytesIO()
@@ -850,9 +953,11 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
                          auto_data=None, exact_replacements=None):
     width, height = 595, 842 
     img = None
+    
     if original_pdf_bytes and HAS_PYMUPDF:
         if auto_data or exact_replacements:
             original_pdf_bytes = replace_text_in_pdf_bytes(original_pdf_bytes, auto_data, exact_replacements)
+            
         try:
             doc = fitz.open(stream=original_pdf_bytes, filetype="pdf")
             page = doc.load_page(0)
@@ -867,10 +972,13 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
         draw.text((40, 400), "ORIJINAL PDF GORUNTUSU ICIN LUTFEN 'PyMuPDF' KUTUPHANESINI YUKLEYIN", fill=(150, 150, 150))
     
     draw = ImageDraw.Draw(img)
+    
     if top_mask_h > 0 and top_mask_w > 0:
         draw.rectangle([top_mask_x, top_mask_y, top_mask_x + top_mask_w, top_mask_y + top_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
+        
     if bot_mask_h > 0 and bot_mask_w > 0:
         draw.rectangle([bot_mask_x, bot_mask_y, bot_mask_x + bot_mask_w, bot_mask_y + bot_mask_h], fill=(255, 255, 255), outline=(200, 0, 0)) 
+    
     if dealer_logo_bytes:
         try:
             logo = Image.open(io.BytesIO(dealer_logo_bytes)).convert("RGBA")
@@ -879,6 +987,7 @@ def generate_sds_preview(original_pdf_bytes, dealer_logo_bytes, dealer_address,
             logo = logo.resize((int(logo_w), logo_h), Image.Resampling.LANCZOS)
             img.paste(logo, (int(logo_x), int(logo_y)), logo)
         except: pass
+        
     if dealer_address:
         try:
             font = ImageFont.load_default()
