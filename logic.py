@@ -330,215 +330,6 @@ def get_gemini_response_from_manual(full_prompt, api_key):
             continue
     return f"❌ HATA / ERROR: {last_err}"
 
-# ==============================================================================
-# 🧠 V 131.0 - AI SIFIRDAN BELGE ÜRETİM MOTORU VE ÖZEL FORMATLAYICI
-# ==============================================================================
-def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code, extra_params=None):
-    if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
-    lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
-    lang_name = lang_dict.get('name', 'Turkish')
-    
-    header_instructions = ""
-    sec1_instructions = ""
-    sec9_instructions = ""
-    sec16_instructions = ""
-    
-    if extra_params:
-        # Üst Başlık Kalkanı
-        header_instructions = f"""
-        At the VERY BEGINNING of the document (Before Section 1 starts), output exactly these lines with bold headers:
-        **Oluşturma Tarihi:** {extra_params.get('c_date', '')}
-        **Revizyon Tarihi:** {extra_params.get('r_date', '')}
-        **Versiyon:** {extra_params.get('vers', '')}
-        """
-        
-        # Bölüm 1 Tedarikçi Kalkanı
-        sec1_instructions = f"""
-        For SECTION 1, include the following exact supplier details:
-        - Üretici/Tedarikçi: {extra_params.get('sup_name', '')}
-        - Adres: {extra_params.get('sup_addr', '')}
-        - Telefon Numarası: {extra_params.get('sup_tel', '')}
-        - Faks Numarası: {extra_params.get('sup_fax', '')}
-        - E-posta: {extra_params.get('sup_mail', '')}
-        """
-        
-        # Bölüm 9 Fiziksel Özellik Kalkanı
-        sec9_instructions = f"""
-        For SECTION 9, use the following exact values if they are provided. If a value is empty, estimate it. If a value is exactly "-", exclude it.
-        - Fiziksel Hali: {extra_params.get('p_state', '')}
-        - Renk: {extra_params.get('p_color', '')}
-        - Koku: {extra_params.get('p_odor', '')}
-        - pH: {extra_params.get('p_ph', '')}
-        - Yoğunluk: {extra_params.get('p_dens', '')}
-        - Parlama Noktası: {extra_params.get('p_flash', '')}
-        """
-        
-        # Bölüm 16 Revizyon Kalkanı
-        sec16_instructions = f"""
-        For SECTION 16, include the following exact revision history details:
-        - Revizyon No: {extra_params.get('rev_no', '')}
-        - Revizyon Tarihi: {extra_params.get('rev_date', '')}
-        - Önceki GBF Tarihi: {extra_params.get('prev_date', '')}
-        """
-
-    # V 131.0: Tablo Çökmelerini Önleyen Kritik Format Kalkanı
-    table_instructions = """
-    CRITICAL FORMATTING RULE FOR SECTION 3 (COMPOSITION/INFORMATION ON INGREDIENTS):
-    DO NOT use Markdown tables (DO NOT use the '|' character to draw tables). The PDF drawing engine cannot process pipe tables.
-    Instead, you MUST format the ingredient list as a clean, readable bulleted list. 
-    Example format:
-    * **Kimyasal Adı:** Sodyum Hidroksit, **CAS No:** 1310-73-2, **Konsantrasyon:** %10, **Sınıflandırma:** Skin Corr. 1A; H314
-    """
-    
-    if "SDS" in doc_type:
-        prompt = f"""
-        ACT AS: A Senior Chemical Regulatory Expert and Toxicologist.
-        MISSION: Generate a comprehensive 16-section Safety Data Sheet (SDS / GBF) according to GHS/CLP and REACH regulations based on the provided recipe.
-        
-        PRODUCT NAME: {product_name}
-        PRODUCT INTENDED USE: {product_type}
-        INGREDIENTS & COMPOSITION:
-        {ingredients}
-        
-        {header_instructions}
-        
-        REQUIREMENTS:
-        1. Calculate or estimate the hazard classifications (H-codes, P-codes).
-        2. Determine the UN Number for Section 14.
-        3. Structure the output strictly into the standard 16 SDS sections.
-        
-        {table_instructions}
-        {sec1_instructions}
-        {sec9_instructions}
-        {sec16_instructions}
-        
-        CRITICAL LANGUAGE RULE: 
-        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
-        """
-    else:
-        prompt = f"""
-        ACT AS: A Senior Chemical Engineer and Product Manager.
-        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product recipe.
-        
-        PRODUCT NAME: {product_name}
-        PRODUCT INTENDED USE: {product_type}
-        INGREDIENTS & COMPOSITION:
-        {ingredients}
-        
-        {header_instructions}
-        
-        REQUIREMENTS:
-        1. Provide a strong 'Product Description'.
-        2. List 'Application Areas'.
-        3. List 'Features & Benefits'.
-        4. Suggest 'Application & Dosage'.
-        5. Provide a 'Physical Properties' list.
-        
-        {table_instructions}
-        {sec1_instructions}
-        {sec9_instructions}
-        
-        CRITICAL LANGUAGE RULE: 
-        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
-        """
-    
-    models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
-    genai.configure(api_key=api_key)
-    
-    last_err = ""
-    for model_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            if response and response.text:
-                return response.text
-        except Exception as e:
-            last_err = str(e)
-            time.sleep(0.5)
-            continue
-    return f"❌ HATA / ERROR: API Bağlantı Sorunu. Detay: {last_err}"
-
-def create_generated_document_pdf(text_content, logo_bytes, footer_text, lang_code):
-    if not HAS_REPORTLAB: return None
-    buffer = io.BytesIO()
-    width, height = A4
-    c = canvas.Canvas(buffer, pagesize=A4)
-    font_name = register_embedded_font() or "Helvetica"
-    
-    def draw_bg(canvas_obj, page_num):
-        if logo_bytes:
-            try:
-                logo_img = ImageReader(io.BytesIO(logo_bytes))
-                pil_img = Image.open(io.BytesIO(logo_bytes))
-                aspect = pil_img.height / float(pil_img.width)
-                w = 120
-                h = w * aspect
-                if h > 50:
-                    h = 50
-                    w = h / aspect
-                canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
-            except: pass
-        
-        canvas_obj.setStrokeColorRGB(0.7, 0.7, 0.7)
-        canvas_obj.setLineWidth(1)
-        canvas_obj.line(40, height - 80, width - 40, height - 80) 
-        canvas_obj.line(40, 60, width - 40, 60) 
-        
-        if footer_text:
-            canvas_obj.setFont(font_name, 8)
-            canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
-            lines = footer_text.split('\n')
-            y_start = 48
-            for l in lines:
-                canvas_obj.drawString(40, y_start, l.strip()[:150])
-                y_start -= 10
-        
-        canvas_obj.setFont(font_name, 8)
-        canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
-        canvas_obj.drawRightString(width - 40, 48, f"Sayfa {page_num}")
-        canvas_obj.setFillColorRGB(0, 0, 0)
-    
-    page_num = 1
-    draw_bg(c, page_num)
-    text_y = height - 110
-    
-    for p in text_content.split('\n'):
-        p = p.strip()
-        if not p:
-            text_y -= 8
-            continue
-            
-        is_header = p.startswith('#')
-        
-        # Markdown Sembol Temizliği (Tablo çökmelerine karşı | da temizleniyor)
-        clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
-        
-        if is_header:
-            c.setFont(font_name, 12)
-            text_y -= 6
-        else:
-            c.setFont(font_name, 9)
-            
-        wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
-        
-        for wl in wrapped:
-            if text_y < 85: 
-                c.showPage()
-                page_num += 1
-                draw_bg(c, page_num)
-                text_y = height - 110
-                c.setFont(font_name, 12 if is_header else 9)
-                
-            c.drawString(40, text_y, wl)
-            text_y -= 12
-        text_y -= 4 
-            
-    c.save()
-    buffer.seek(0)
-    return buffer.getvalue()
-
-
-# --- DİĞER FONKSİYONLAR ---
 def get_linkedin_user_urn(access_token):
     access_token = str(access_token).strip()
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -679,6 +470,290 @@ def construct_prompt_text(role, topic, audience, platform, product, limit, lang_
     5. FORMATTING: Use short paragraphs for readability, and relevant industrial emojis (e.g., ⚗️, ⚙️, 🏭, 💧, 📊) to structure the data.
     """
     return prompt.strip()
+
+def register_embedded_font():
+    font_path = "DejaVuSans.ttf"
+    if not os.path.exists(font_path):
+        try:
+            url = "https://github.com/dejavu-fonts/dejavu-fonts/raw/master/ttf/DejaVuSans.ttf"
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                with open(font_path, "wb") as f: f.write(r.content)
+        except: return None
+    if os.path.exists(font_path):
+        try: pdfmetrics.registerFont(TTFont('TrFont', font_path)); return "TrFont"
+        except: return None
+    return None
+
+def create_pdf(invoice_info, shipping_addr, period, payment, bank_info, items, currency, show_total, custom_note, lang_code):
+    if not HAS_REPORTLAB: return None
+    t = lambda k: config.LANGUAGES.get(lang_code, config.LANGUAGES['TR']).get(k, k)
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4); width, height = A4
+    f_reg = register_embedded_font() or "Helvetica"
+    
+    is_pdf_template = False
+    template_bytes = st.session_state.get('template_data')
+    if template_bytes:
+        if isinstance(template_bytes, bytes) and b'%PDF' in template_bytes[:50]: is_pdf_template = True
+        else:
+            try: c.drawImage(ImageReader(io.BytesIO(template_bytes)), 0, 0, width=width, height=height)
+            except: pass
+
+    start_y = height - 190
+    c.setFont(f_reg, 10); c.drawString(50, start_y, t('q_invoice_info'))
+    txt = c.beginText(50, start_y - 15); txt.setFont(f_reg, 10)
+    for l in invoice_info.split('\n'): txt.textLine(l[:50])
+    c.drawText(txt)
+    
+    c.setFont(f_reg, 10); c.drawString(350, start_y, f"{t('q_date')}: {datetime.now().strftime('%d.%m.%Y')}")
+    c.drawString(350, start_y - 20, f"{t('q_period')} {period}")
+    c.drawString(350, start_y - 35, f"{t('q_payment')} {payment}")
+    
+    y = start_y - 120; c.line(40, y+15, 560, y+15); c.setFont(f_reg, 9)
+    amb_text = {"TR":"Ambalaj", "EN":"Package", "RU":"Упаковка", "AR":"التعبئة", "FR":"Emballage", "ES":"Paquete"}.get(lang_code, "Ambalaj")
+    c.drawString(40, y, t('q_prod_name')); c.drawString(220, y, amb_text); c.drawString(450, y, f"{t('q_price')} ({currency})")
+    
+    y -= 20; grand_total = 0
+    for it in items:
+        try:
+            p = float(it.get('price', 0)); q = float(it.get('qty', 1)); line_total = p * q; grand_total += line_total
+            name_text = str(it.get('name', '')); wrapped_name = textwrap.wrap(name_text, width=35) 
+            if not wrapped_name: wrapped_name = [""]
+            c.drawString(40, y, wrapped_name[0]); c.drawString(220, y, str(it.get('pkg', ''))[:15]); c.drawString(450, y, f"{p:,.2f}"); y -= 15
+            if len(wrapped_name) > 1:
+                for extra_line in wrapped_name[1:]: c.drawString(40, y, extra_line); y -= 15
+            y -= 5 
+        except: continue
+    
+    if show_total: 
+        c.setFont(f_reg, 11); c.line(40, y, 560, y); c.drawString(350, y-20, f"{t('q_total')}: {grand_total:,.2f} {currency}")
+    
+    bank_y = 100; c.setFont(f_reg, 9); c.drawString(50, bank_y, t('q_bank_lbl')); c.drawString(140, bank_y, bank_info.replace('\n', ' | '))
+    c.save(); buffer.seek(0)
+    
+    if is_pdf_template and HAS_PYPDF:
+        try:
+            text_pdf = PdfReader(buffer); template_pdf = PdfReader(io.BytesIO(template_bytes)); writer = PdfWriter()
+            template_page = template_pdf.pages[0]; text_page = text_pdf.pages[0]
+            if hasattr(template_page, "merge_page"): template_page.merge_page(text_page)
+            elif hasattr(template_page, "mergePage"): template_page.mergePage(text_page)
+            writer.add_page(template_page); merged_buffer = io.BytesIO(); writer.write(merged_buffer); merged_buffer.seek(0); return merged_buffer
+        except Exception as e: return buffer
+    return buffer
+
+# ==============================================================================
+# 🧠 V 131.1 - AI SIFIRDAN BELGE ÜRETİM MOTORU (KATI ŞABLON KURALLI)
+# ==============================================================================
+def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients, doc_type, api_key, lang_code, extra_params=None):
+    if not api_key: return "❌ Lütfen API anahtarını girin. / Please enter API key."
+    lang_dict = config.LANGUAGES.get(lang_code, config.LANGUAGES['TR'])
+    lang_name = lang_dict.get('name', 'Turkish')
+    
+    s1_lines = []
+    if extra_params:
+        if extra_params.get('sup_name') != '-': s1_lines.append(f"- Üretici/Tedarikçi: {extra_params.get('sup_name') or '[Şirket Adı]'}")
+        if extra_params.get('sup_addr') != '-': s1_lines.append(f"- Adres: {extra_params.get('sup_addr') or '[Şirket Adresi]'}")
+        if extra_params.get('sup_tel') != '-': s1_lines.append(f"- Telefon Numarası: {extra_params.get('sup_tel') or '[Telefon Numarası]'}")
+        if extra_params.get('sup_fax') != '-': s1_lines.append(f"- Faks Numarası: {extra_params.get('sup_fax') or '[Faks Numarası]'}")
+        if extra_params.get('sup_mail') != '-': s1_lines.append(f"- E-posta: {extra_params.get('sup_mail') or '[E-posta Adresi]'}")
+    sec1_block = "\n".join(s1_lines)
+
+    s9_lines = []
+    if extra_params:
+        def add_s9(key, label):
+            val = extra_params.get(key, '')
+            if val == '-': return
+            if not val: val = '[AI_ESTIMATE]'
+            s9_lines.append(f"- {label}: {val}")
+            
+        add_s9('p_state', 'Fiziksel Hali')
+        add_s9('p_color', 'Renk')
+        add_s9('p_odor', 'Koku')
+        add_s9('p_ph', 'pH')
+        add_s9('p_dens', 'Bağıl Yoğunluk')
+        add_s9('p_flash', 'Parlama Noktası')
+    sec9_block = "\n".join(s9_lines)
+
+    s16_lines = []
+    if extra_params:
+        def add_s16(key, label):
+            val = extra_params.get(key, '')
+            if val == '-': return
+            if val: s16_lines.append(f"- {label}: {val}")
+        add_s16('rev_no', 'Revizyon No')
+        add_s16('rev_date', 'Revizyon Tarihi')
+        add_s16('prev_date', 'Önceki GBF Tarihi')
+    sec16_block = "\n".join(s16_lines)
+
+    if "SDS" in doc_type:
+        prompt = f"""
+        ACT AS: A Senior Chemical Regulatory Expert and Toxicologist.
+        MISSION: Generate a comprehensive 16-section Safety Data Sheet (SDS / GBF) according to GHS/CLP and REACH regulations based on the provided recipe.
+        
+        PRODUCT NAME: {product_name}
+        PRODUCT INTENDED USE: {product_type}
+        INGREDIENTS & COMPOSITION:
+        {ingredients}
+        
+        REQUIREMENTS:
+        1. Calculate or estimate the hazard classifications (H-codes, P-codes).
+        2. Determine the UN Number for Section 14.
+        3. Structure the output strictly into the standard 16 SDS sections.
+        
+        STRICT TEMPLATE RULES:
+        For SECTION 1 (Identification), you MUST exactly include this information:
+        {sec1_block}
+
+        For SECTION 3 (Composition), DO NOT USE markdown tables. Use a clean bulleted list instead:
+        * **Kimyasal Adı:** [Name], **CAS No:** [CAS], **Konsantrasyon:** [%], **Sınıflandırma:** [Class]
+
+        For SECTION 9 (Physical Properties), use these exact lines. If a value says '[AI_ESTIMATE]', you MUST replace it with your scientific estimation based on the chemistry. If a physical property is not in this list, do not generate it:
+        {sec9_block}
+
+        For SECTION 16 (Other Info), append these exact revision lines if provided:
+        {sec16_block}
+        
+        DO NOT write "Oluşturma Tarihi" or "Revizyon Tarihi" at the very beginning of the document. Start directly with "BÖLÜM 1".
+        
+        CRITICAL LANGUAGE RULE: 
+        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
+        """
+    else:
+        prompt = f"""
+        ACT AS: A Senior Chemical Engineer and Product Manager.
+        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product recipe.
+        
+        PRODUCT NAME: {product_name}
+        PRODUCT INTENDED USE: {product_type}
+        INGREDIENTS & COMPOSITION:
+        {ingredients}
+        
+        REQUIREMENTS:
+        1. Provide a strong 'Product Description'.
+        2. List 'Application Areas'.
+        3. List 'Features & Benefits'.
+        4. Suggest 'Application & Dosage'.
+        
+        STRICT TEMPLATE RULES:
+        For SECTION 1 (Identification), you MUST exactly include this information:
+        {sec1_block}
+
+        For SECTION 9 (Physical Properties), use these exact lines. If a value says '[AI_ESTIMATE]', replace it with your scientific estimation.
+        {sec9_block}
+        
+        DO NOT use markdown tables ('|' character). Use bullet points instead.
+        DO NOT write header dates. Start directly with the main content.
+        
+        CRITICAL LANGUAGE RULE: 
+        You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
+        """
+    
+    models_to_try = ['gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.5-pro']
+    genai.configure(api_key=api_key)
+    
+    last_err = ""
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            last_err = str(e)
+            time.sleep(0.5)
+            continue
+    return f"❌ HATA / ERROR: API Bağlantı Sorunu. Detay: {last_err}"
+
+def create_generated_document_pdf(text_content, logo_bytes, footer_text, lang_code, header_params=None):
+    if not HAS_REPORTLAB: return None
+    buffer = io.BytesIO()
+    width, height = A4
+    c = canvas.Canvas(buffer, pagesize=A4)
+    font_name = register_embedded_font() or "Helvetica"
+    
+    def draw_bg(canvas_obj, page_num):
+        if logo_bytes:
+            try:
+                logo_img = ImageReader(io.BytesIO(logo_bytes))
+                pil_img = Image.open(io.BytesIO(logo_bytes))
+                aspect = pil_img.height / float(pil_img.width)
+                w = 120
+                h = w * aspect
+                if h > 50:
+                    h = 50
+                    w = h / aspect
+                canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
+            except: pass
+            
+        if header_params and page_num == 1:
+            canvas_obj.setFont(font_name, 9)
+            canvas_obj.setFillColorRGB(0, 0, 0)
+            hy = height - 25
+            if header_params.get('c_date') and header_params.get('c_date') != '-':
+                canvas_obj.drawRightString(width - 40, hy, f"Oluşturma Tarihi: {header_params['c_date']}")
+                hy -= 12
+            if header_params.get('r_date') and header_params.get('r_date') != '-':
+                canvas_obj.drawRightString(width - 40, hy, f"Revizyon Tarihi: {header_params['r_date']}")
+                hy -= 12
+            if header_params.get('vers') and header_params.get('vers') != '-':
+                canvas_obj.drawRightString(width - 40, hy, f"Versiyon: {header_params['vers']}")
+        
+        canvas_obj.setStrokeColorRGB(0.7, 0.7, 0.7)
+        canvas_obj.setLineWidth(1)
+        canvas_obj.line(40, height - 80, width - 40, height - 80) 
+        canvas_obj.line(40, 60, width - 40, 60) 
+        
+        if footer_text:
+            canvas_obj.setFont(font_name, 8)
+            canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
+            lines = footer_text.split('\n')
+            y_start = 48
+            for l in lines:
+                canvas_obj.drawString(40, y_start, l.strip()[:150])
+                y_start -= 10
+        
+        canvas_obj.setFont(font_name, 8)
+        canvas_obj.setFillColorRGB(0.3, 0.3, 0.3)
+        canvas_obj.drawRightString(width - 40, 48, f"Sayfa {page_num}")
+        canvas_obj.setFillColorRGB(0, 0, 0)
+    
+    page_num = 1
+    draw_bg(c, page_num)
+    text_y = height - 110
+    
+    for p in text_content.split('\n'):
+        p = p.strip()
+        if not p:
+            text_y -= 8
+            continue
+            
+        is_header = p.startswith('#')
+        clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
+        
+        if is_header:
+            c.setFont(font_name, 12)
+            text_y -= 6
+        else:
+            c.setFont(font_name, 9)
+            
+        wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
+        
+        for wl in wrapped:
+            if text_y < 85: 
+                c.showPage()
+                page_num += 1
+                draw_bg(c, page_num)
+                text_y = height - 110
+                c.setFont(font_name, 12 if is_header else 9)
+                
+            c.drawString(40, text_y, wl)
+            text_y -= 12
+        text_y -= 4 
+            
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
 
 # ==============================================================================
 # 🧠 V 126.1 - LAZER KESİM REDAKSİYON (ESKİ SİSTEMLER İÇİN)
