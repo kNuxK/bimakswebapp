@@ -412,16 +412,17 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_chem = st.text_input("5. Kimyasal Adı", placeholder="Örn: TEMİZLEYİCİ")
                         new_sup = st.text_input("6. Tedarikçi Firma", placeholder="Örn: YENİ FİRMA LTD. ŞTİ.")
                         new_add = st.text_area("7. Tedarikçi Adresi", placeholder="Örn: Yeni Mah. Sokak No:1\nİlçe / Şehir", height=68)
+                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                     
                     with c_s2:
-                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                         new_fax = st.text_input("9. Tedarikçi Fax", placeholder="Örn: 0 212 123 45 67")
                         new_mail = st.text_input("10. Tedarikçi Email", placeholder="Örn: info@bayi.com")
                         new_web = st.text_input("11. Tedarikçi Web Adresi", placeholder="Örn: www.bayi.com")
-                        new_contact = st.text_input("12. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
-                        new_gbf = st.text_input("13. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
-                        new_cert_date = st.text_input("14. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
-                        new_cert_no = st.text_input("15. Sertifika No", placeholder="Örn: YENİ-NO")
+                        new_emer = st.text_input("12. Acil Durum Telefonu", placeholder="Örn: 112")
+                        new_contact = st.text_input("13. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
+                        new_gbf = st.text_input("14. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
+                        new_cert_date = st.text_input("15. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
+                        new_cert_no = st.text_input("16. Sertifika No", placeholder="Örn: YENİ-NO")
 
                     auto_data = {
                         "ÜRÜN ADI": ("", new_prod),
@@ -441,10 +442,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         "Web:": (" ", new_web),
                         "Web": (": ", new_web),
                         "BAŞVURULACAK KİŞİ": ("", new_contact),
-                        "ACİL DURUM TELEFONU": ("", new_tel),
-                        "ACİL DURUM TEL:": (" ", new_tel),
-                        "ACİL DURUM TEL": ("", new_tel),
-                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_tel),
+                        "ACİL DURUM TELEFONU": ("", new_emer),
+                        "ACİL DURUM TEL:": (" ", new_emer),
+                        "ACİL DURUM TEL": ("", new_emer),
+                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_emer),
                         "GBF Yetkili Kişi:": (" ", new_gbf),
                         "GBF Yetkili Kişi": (": ", new_gbf),
                         "Sertifika Geçerlilik Süresi:": (" ", new_cert_date),
@@ -553,7 +554,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
-    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 131.0 - ÖZELLEŞTİRİLMİŞ EKRAN)
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 131.1 - KATI ŞABLON ENTEGRASYONU)
     elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
         st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
         st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
@@ -591,6 +592,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             gen_p_flash = c_92.text_input("Parlama Noktası", placeholder="Örn: Uygulanamaz")
             
         with st.expander("🕒 Bölüm 16: Revizyon Bilgileri (İsteğe Bağlı)"):
+            st.caption("Boş bırakılırsa yazılmaz. Çıkarmak için '-' yazın.")
             c_161, c_162 = st.columns(2)
             gen_rev_no = c_161.text_input("Revizyon No", placeholder="Örn: 02")
             gen_rev_date = c_162.text_input("Bölüm 16 Revizyon Tarihi", placeholder="Örn: 20.08.2025")
@@ -636,7 +638,14 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         st.error(res_text)
                     else:
                         st.session_state['generated_sds_content'] = res_text
-                        pdf_bytes = logic.create_generated_document_pdf(res_text, gen_logo.getvalue() if gen_logo else None, gen_footer, st.session_state['lang'])
+                        # V 131.1 - Header Params PDF çiziciye gönderiliyor
+                        pdf_bytes = logic.create_generated_document_pdf(
+                            res_text, 
+                            gen_logo.getvalue() if gen_logo else None, 
+                            gen_footer, 
+                            st.session_state['lang'],
+                            extra_params
+                        )
                         
                         if pdf_bytes:
                             st.session_state['generated_sds_pdf'] = pdf_bytes
@@ -941,7 +950,7 @@ elif st.session_state.get('show_settings'):
             with st.spinner("Veritabanına kaydediliyor..."):
                 is_saved = logic.update_user_keys(st.session_state['current_user'], k1, k2, k3, k4)
                 if is_saved:
-                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ в قاعدة البيانات!", "Enregistré dans la BD !", "¡Guardado en la BD!"))
+                    st.success(_("Veritabanına Kaydedildi!", "Saved to DB!", "Сохранено в БД!", "تم الحفظ في قاعدة البيانات!", "Enregistré dans la BD !", "¡Guardado en la BD!"))
                 else:
                     st.error("Veritabanına kaydedilirken bir hata oluştu.")
             time.sleep(1); st.rerun()
