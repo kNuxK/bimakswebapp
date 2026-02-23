@@ -164,6 +164,11 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         tab_keys.append('Teklif')
     if "tech_sds" in perms or is_admin: nav_tabs.append("SDS/TDS"); tab_keys.append('SDS')
     
+    # V 129.0 - AI Belge Üretici Sekmesi
+    if "tech_sds_gen" in perms or is_admin: 
+        nav_tabs.append(_("Sıfırdan SDS/TDS Üretici", "SDS/TDS Generator", "Генератор SDS/TDS", "منشئ SDS/TDS", "Générateur FDS/FT", "Generador HDS/HT"))
+        tab_keys.append('SDS_Gen')
+    
     if not nav_tabs:
         st.warning("Bu modülün hiçbir alt başlığına yetkiniz bulunmamaktadır.")
         st.stop()
@@ -370,7 +375,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 128.0)
+    # F. BAYİ SDS/TDS ÜRETİCİ
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -411,16 +416,17 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_chem = st.text_input("5. Kimyasal Adı", placeholder="Örn: TEMİZLEYİCİ")
                         new_sup = st.text_input("6. Tedarikçi Firma", placeholder="Örn: YENİ FİRMA LTD. ŞTİ.")
                         new_add = st.text_area("7. Tedarikçi Adresi", placeholder="Örn: Yeni Mah. Sokak No:1\nİlçe / Şehir", height=68)
+                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                     
                     with c_s2:
-                        new_tel = st.text_input("8. Tedarikçi Telefonu", placeholder="Örn: 0 555 555 55 55")
                         new_fax = st.text_input("9. Tedarikçi Fax", placeholder="Örn: 0 212 123 45 67")
                         new_mail = st.text_input("10. Tedarikçi Email", placeholder="Örn: info@bayi.com")
                         new_web = st.text_input("11. Tedarikçi Web Adresi", placeholder="Örn: www.bayi.com")
-                        new_contact = st.text_input("12. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
-                        new_gbf = st.text_input("13. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
-                        new_cert_date = st.text_input("14. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
-                        new_cert_no = st.text_input("15. Sertifika No", placeholder="Örn: YENİ-NO")
+                        new_emer = st.text_input("12. Acil Durum Telefonu", placeholder="Örn: 112")
+                        new_contact = st.text_input("13. Başvurulacak Kişi (Tablo)", placeholder="Örn: ALİ VELİ")
+                        new_gbf = st.text_input("14. GBF Yetkili Kişi (Son Sayfa)", placeholder="Örn: YENİ İSİM")
+                        new_cert_date = st.text_input("15. Sertifika Geçerlilik Süresi", placeholder="Örn: 01.01.2028")
+                        new_cert_no = st.text_input("16. Sertifika No", placeholder="Örn: YENİ-NO")
 
                     auto_data = {
                         "ÜRÜN ADI": ("", new_prod),
@@ -440,10 +446,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         "Web:": (" ", new_web),
                         "Web": (": ", new_web),
                         "BAŞVURULACAK KİŞİ": ("", new_contact),
-                        "ACİL DURUM TELEFONU": ("", new_tel),
-                        "ACİL DURUM TEL:": (" ", new_tel),
-                        "ACİL DURUM TEL": ("", new_tel),
-                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_tel),
+                        "ACİL DURUM TELEFONU": ("", new_emer),
+                        "ACİL DURUM TEL:": (" ", new_emer),
+                        "ACİL DURUM TEL": ("", new_emer),
+                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_emer),
                         "GBF Yetkili Kişi:": (" ", new_gbf),
                         "GBF Yetkili Kişi": (": ", new_gbf),
                         "Sertifika Geçerlilik Süresi:": (" ", new_cert_date),
@@ -551,6 +557,34 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 exact_replacements
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
+
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 129.0 - YAPAY ZEKA DESTEKLİ)
+    elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
+        st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
+        st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu metni veya TDS oluşturur.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
+        
+        doc_choice = st.radio("Belge Türü", ["SDS (Güvenlik Bilgi Formu)", "TDS (Teknik Veri Bülteni)"], horizontal=True)
+        
+        c_g1, c_g2 = st.columns(2)
+        with c_g1:
+            gen_prod_name = st.text_input("Ürün Adı", placeholder="Örn: MAKS 400PD")
+            gen_prod_type = st.text_input("Kullanım Amacı / Ürün Tipi", placeholder="Örn: Ters Osmoz Antiskalantı")
+        with c_g2:
+            gen_ingredients = st.text_area("Bileşenler ve Yüzdeleri (Reçete)", placeholder="Örn: %10 Sodyum Hidroksit (CAS: 1310-73-2)\n%5 Fosfonat\n%85 Su", height=115)
+            
+        if st.button("AI ile Belge Metni Üret", type="primary"):
+            if not gen_prod_name or not gen_ingredients:
+                st.warning("Lütfen Ürün Adı ve Bileşenleri (Reçeteyi) girin.")
+            else:
+                logic.ping_online(st.session_state['current_user'])
+                with st.spinner("AI kimyasal formülü analiz ediyor ve uluslararası normlara göre belgeyi yazıyor... (Bu işlem 10-20 saniye sürebilir)"):
+                    res = logic.generate_sds_from_recipe_with_gemini(gen_prod_name, gen_prod_type, gen_ingredients, doc_choice, st.session_state['settings_db']["genai_key"], st.session_state['lang'])
+                    st.session_state['generated_sds_content'] = res
+        
+        if st.session_state.get('generated_sds_content'):
+            st.markdown("---")
+            st.markdown("### 📄 Üretilen Belge Metni")
+            st.markdown(st.session_state['generated_sds_content'])
 
 # 2. LINKEDIN
 elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_state.get('show_settings'):
@@ -702,6 +736,8 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
     p_tech_reg = c2.checkbox("↳ Global Mevzuat", value="tech_reg" in curr_perms)
     p_tech_quo = c2.checkbox("↳ Teklif Oluştur", value="tech_quo" in curr_perms)
     p_tech_sds = c2.checkbox("↳ SDS/TDS", value="tech_sds" in curr_perms)
+    # V 129.0: Yeni yetki kontrol kutusu
+    p_tech_sds_gen = c2.checkbox("↳ Sıfırdan SDS Üretici (AI)", value="tech_sds_gen" in curr_perms)
     
     if st.button(f"💾 {sel_role} Yetkilerini Kaydet", type="primary"):
         new_perms = []
@@ -715,6 +751,7 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
         if p_tech_reg: new_perms.append("tech_reg")
         if p_tech_quo: new_perms.append("tech_quo")
         if p_tech_sds: new_perms.append("tech_sds")
+        if p_tech_sds_gen: new_perms.append("tech_sds_gen")
         
         role_defs[sel_role] = ",".join(new_perms)
         logic.update_role_definitions(role_defs["Admin"], role_defs["Bimaks Üye"], role_defs["Yeni Üye"])
@@ -822,7 +859,7 @@ elif st.session_state.get('show_settings'):
                 
     with c2:
         st.subheader(_("Kişisel API Ayarların", "Personal API Settings", "Ваши настройки API", "إعدادات API الشخصية", "Paramètres d'API personnels", "Configuración personal de API"))
-        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД tylko для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط.", "Les clés saisies ici sont enregistrées en toute sécurité.", "Las claves ingresadas aquí se guardan de forma segura."))
+        st.info(_("Buraya girdiğiniz anahtarlar veritabanında güvenle sadece sizin hesabınıza kaydedilir.", "Keys entered here are securely saved to your account in the DB.", "Эти ключи сохраняются в БД только для вашего аккаунта.", "يتم حفظ هذه المفاتيح في قاعدة البيانات لحسابك فقط.", "Les clés saisies ici sont enregistrées en toute sécurité.", "Las claves ingresadas aquí se guardan de forma segura."))
         
         k1 = st.text_input("Gemini API", st.session_state['settings_db'].get("genai_key", ""), type="password")
         k2 = st.text_input("LinkedIn Token", st.session_state['settings_db'].get("linkedin_token", ""), type="password")
