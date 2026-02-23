@@ -163,11 +163,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         nav_tabs.append(_("Teklif Oluştur", "Quote Generator", "Генератор предложений", "مولد الاقتباس", "Créer un devis", "Crear cotización"))
         tab_keys.append('Teklif')
     if "tech_sds" in perms or is_admin: nav_tabs.append("SDS/TDS"); tab_keys.append('SDS')
-    
-    # V 129.0 - AI Belge Üretici Sekmesi
-    if "tech_sds_gen" in perms or is_admin: 
-        nav_tabs.append(_("Sıfırdan SDS/TDS Üretici", "SDS/TDS Generator", "Генератор SDS/TDS", "منشئ SDS/TDS", "Générateur FDS/FT", "Generador HDS/HT"))
-        tab_keys.append('SDS_Gen')
+    if "tech_sds_gen" in perms or is_admin: nav_tabs.append(_("Sıfırdan SDS/TDS Üretici", "SDS/TDS Generator", "Генератор SDS/TDS", "منشئ SDS/TDS", "Générateur FDS/FT", "Generador HDS/HT")); tab_keys.append('SDS_Gen')
     
     if not nav_tabs:
         st.warning("Bu modülün hiçbir alt başlığına yetkiniz bulunmamaktadır.")
@@ -558,10 +554,10 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
-    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 129.0 - YAPAY ZEKA DESTEKLİ)
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 130.0 - YAPAY ZEKA VE PDF MOTORU)
     elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
         st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
-        st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu metni veya TDS oluşturur.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
+        st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
         
         doc_choice = st.radio("Belge Türü", ["SDS (Güvenlik Bilgi Formu)", "TDS (Teknik Veri Bülteni)"], horizontal=True)
         
@@ -569,22 +565,42 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
         with c_g1:
             gen_prod_name = st.text_input("Ürün Adı", placeholder="Örn: MAKS 400PD")
             gen_prod_type = st.text_input("Kullanım Amacı / Ürün Tipi", placeholder="Örn: Ters Osmoz Antiskalantı")
+            gen_logo = st.file_uploader("Firma Logosu (PDF Sağ Üst Köşesi İçin)", type=['png', 'jpg', 'jpeg'], key="gen_logo_upl")
+            gen_footer = st.text_area("Tedarikçi Adresi / Alt Bilgi (Tüm Sayfaların Altına)", placeholder="Örn: Fatih Sultan Mehmet Mah...\nTel: 0555...\nWeb: www...", height=80)
         with c_g2:
-            gen_ingredients = st.text_area("Bileşenler ve Yüzdeleri (Reçete)", placeholder="Örn: %10 Sodyum Hidroksit (CAS: 1310-73-2)\n%5 Fosfonat\n%85 Su", height=115)
+            gen_ingredients = st.text_area("Bileşenler ve Yüzdeleri (Reçete)", placeholder="Örn: %10 Sodyum Hidroksit (CAS: 1310-73-2)\n%5 Fosfonat\n%85 Su", height=300)
             
-        if st.button("AI ile Belge Metni Üret", type="primary"):
+        if st.button("AI ile Belgeyi PDF Olarak Üret", type="primary"):
             if not gen_prod_name or not gen_ingredients:
                 st.warning("Lütfen Ürün Adı ve Bileşenleri (Reçeteyi) girin.")
             else:
                 logic.ping_online(st.session_state['current_user'])
-                with st.spinner("AI kimyasal formülü analiz ediyor ve uluslararası normlara göre belgeyi yazıyor... (Bu işlem 10-20 saniye sürebilir)"):
-                    res = logic.generate_sds_from_recipe_with_gemini(gen_prod_name, gen_prod_type, gen_ingredients, doc_choice, st.session_state['settings_db']["genai_key"], st.session_state['lang'])
-                    st.session_state['generated_sds_content'] = res
+                with st.spinner("AI kimyasal formülü analiz ediyor ve uluslararası normlara göre PDF üretiyor... (Bu işlem 15-30 saniye sürebilir)"):
+                    res_text = logic.generate_sds_from_recipe_with_gemini(gen_prod_name, gen_prod_type, gen_ingredients, doc_choice, st.session_state['settings_db']["genai_key"], st.session_state['lang'])
+                    
+                    if "HATA" in res_text or "ERROR" in res_text:
+                        st.error(res_text)
+                    else:
+                        st.session_state['generated_sds_content'] = res_text
+                        pdf_bytes = logic.create_generated_document_pdf(res_text, gen_logo.getvalue() if gen_logo else None, gen_footer, st.session_state['lang'])
+                        
+                        if pdf_bytes:
+                            st.session_state['generated_sds_pdf'] = pdf_bytes
+                            st.success("✅ Belge başarıyla üretildi ve PDF formatına dönüştürüldü!")
+                        else:
+                            st.error("PDF oluşturulurken bir hata meydana geldi.")
         
-        if st.session_state.get('generated_sds_content'):
+        if st.session_state.get('generated_sds_pdf'):
             st.markdown("---")
-            st.markdown("### 📄 Üretilen Belge Metni")
-            st.markdown(st.session_state['generated_sds_content'])
+            st.download_button(
+                label=f"📥 {gen_prod_name} {doc_choice.split()[0]} PDF İndir",
+                data=st.session_state['generated_sds_pdf'],
+                file_name=f"{gen_prod_name}_{doc_choice.split()[0]}.pdf",
+                mime="application/pdf",
+                type="primary"
+            )
+            with st.expander("📄 Üretilen Ham Metni Gör (Düzenleme / Kontrol İçin)"):
+                st.markdown(st.session_state.get('generated_sds_content', ''))
 
 # 2. LINKEDIN
 elif st.session_state.get('active_tab') == t('btn_linkedin') and not st.session_state.get('show_settings'):
@@ -736,7 +752,6 @@ elif st.session_state.get('active_tab') == 'Admin Paneli' and is_admin:
     p_tech_reg = c2.checkbox("↳ Global Mevzuat", value="tech_reg" in curr_perms)
     p_tech_quo = c2.checkbox("↳ Teklif Oluştur", value="tech_quo" in curr_perms)
     p_tech_sds = c2.checkbox("↳ SDS/TDS", value="tech_sds" in curr_perms)
-    # V 129.0: Yeni yetki kontrol kutusu
     p_tech_sds_gen = c2.checkbox("↳ Sıfırdan SDS Üretici (AI)", value="tech_sds_gen" in curr_perms)
     
     if st.button(f"💾 {sel_role} Yetkilerini Kaydet", type="primary"):
