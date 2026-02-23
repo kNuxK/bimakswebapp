@@ -370,7 +370,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 pdf = logic.create_pdf(qi, qs, qp, qpy, qb, st.session_state['quote_items'], qc, q_show_total, q_note, st.session_state['lang'])
                 st.download_button(_("İndir", "Download", "Скачать", "تحميل", "Télécharger", "Descargar"), data=pdf, file_name="Teklif.pdf", mime="application/pdf")
 
-    # F. BAYİ SDS/TDS ÜRETİCİ (V 127.0 - TDS BOLD VE MERKEZLEME)
+    # F. BAYİ SDS/TDS ÜRETİCİ (V 127.1 - TDS AKILLI MERKEZLEME EKLENDİ)
     elif st.session_state['bimaks_sub_tab'] == 'SDS' and ("tech_sds" in perms or is_admin):
         st.subheader(_("Bayi SDS/TDS Oluşturucu", "Dealer SDS/TDS Generator", "Генератор SDS/TDS дилера", "منشئ SDS/TDS للوكيل", "Générateur FDS/FT du distributeur", "Generador HDS/HT del distribuidor"))
         doc_type = st.radio(_("Belge Türünü Seçin:", "Select Document Type:", "Выберите тип документа:", "حدد نوع المستند:", "Sélectionnez le type de document:", "Seleccione el tipo de documento:"), ["SDS", "TDS"], horizontal=True)
@@ -469,7 +469,7 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                         new_tds_sup = st.text_input("Yeni Tedarikçi", placeholder="Örn: YENİ FİRMA")
                         new_tds_phone = st.text_input("Yeni Telefon", placeholder="Örn: 0 555 555 55 55")
                         
-                    # V 127.0 - Tuples ile Bold ve Center bilgisi motora gönderilir (old, new, is_bold, is_center)
+                    # V 127.1 - Sadece En Baştakileri Merkezler, Gövdedekiler orijinal hizasında kalır!
                     if new_tds_prod: exact_replacements.append((old_tds_prod, new_tds_prod, True, True))
                     if new_tds_type: exact_replacements.append((old_tds_type, new_tds_type, True, True))
                     if new_tds_sup: exact_replacements.append((old_tds_sup, new_tds_sup, True, False))
@@ -488,7 +488,6 @@ if st.session_state.get('active_tab') == t('btn_bimaks_tech') and not st.session
                 st.markdown("**2. Alt Beyaz Maske (Kapatmak isterseniz)**")
                 cb1, cb2, cb3, cb4 = st.columns(4)
                 bot_mask_x = cb1.slider("X (Sağ-Sol)", 0, 595, 0, key=f"{doc_type}_bm_x")
-                # V 127.0 - Maske görünür olsun diye default ayarlar 842'den 786'ya çekildi.
                 bot_mask_y = cb2.slider("Y (Yukarı-Aşağı)", 500, 842, 786, key=f"{doc_type}_bm_y")
                 bot_mask_w = cb3.slider("Genişlik", 0, 595, 595, key=f"{doc_type}_bm_w")
                 bot_mask_h = cb4.slider("Yükseklik", 0, 300, 56, key=f"{doc_type}_bm_h")
