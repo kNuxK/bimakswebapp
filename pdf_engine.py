@@ -177,9 +177,11 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 clean_p = clean_p.replace(url, '').strip()
             clean_p = clean_p.replace('![]', '').replace('()', '').replace('[]', '').strip()
             
+            # V 133.4: BÜTÜN BAŞLIKLARI (TDS DAHİL) YAKALAYAN KAPSAMLI BAŞLIK RADARI
+            is_markdown_header = p.startswith('#')
             clean_p = clean_p.replace('#', '').replace('**', '').replace('*', '').strip()
             
-            is_main_header = clean_p.upper().startswith('BÖLÜM') or clean_p.upper().startswith('SECTION')
+            is_main_header = clean_p.upper().startswith('BÖLÜM') or clean_p.upper().startswith('SECTION') or is_markdown_header
             is_sub_header = p.startswith('##') or p.startswith('###')
             
             is_table_row = clean_p.startswith('|') and clean_p.endswith('|')
@@ -197,6 +199,7 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 draw_bg(c, page_num)
                 text_y = height - 110
             
+            # TDS de dahil olmak üzere yakalanan başlıkların arkasına açık gri fon basılır
             if is_main_header or is_sub_header:
                 c.setFillColorRGB(0.92, 0.92, 0.95) 
                 c.rect(35, text_y - 4, 520, 18, fill=1, stroke=0)
@@ -279,7 +282,6 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 text_y -= 12
             text_y -= 4 
             
-            # V 133.3: PİKTOGRAM BOŞLUK OPTİMİZASYONU
             if img_urls:
                 img_x = 40
                 has_drawn = False
@@ -295,7 +297,6 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                             img_x += 45
                             has_drawn = True
                     except: pass
-                # Sadece resim başarıyla çizildiyse aşağıya in. Çizilemediyse boşluk bırakma!
                 if has_drawn:
                     text_y -= 40 
             
