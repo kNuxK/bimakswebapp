@@ -170,20 +170,34 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
         """
     else:
+        # V 134.0: TDS ÖZEL DİNAMİK İÇERİK BLOĞU
+        tds_areas = extra_params.get('tds_areas', '')
+        tds_benefits = extra_params.get('tds_benefits', '')
+        tds_dosage = extra_params.get('tds_dosage', '')
+        tds_pack = extra_params.get('tds_pack', '')
+
+        tds_block = ""
+        if tds_areas: tds_block += f"\nUSER PROVIDED APPLICATION AREAS (Must include): {tds_areas}"
+        if tds_benefits: tds_block += f"\nUSER PROVIDED FEATURES & BENEFITS (Must include): {tds_benefits}"
+        if tds_dosage: tds_block += f"\nUSER PROVIDED APPLICATION & DOSAGE (Must include): {tds_dosage}"
+        if tds_pack: tds_block += f"\nUSER PROVIDED PACKAGING & STORAGE (Must include): {tds_pack}"
+
         prompt = f"""
         ACT AS: A Senior Chemical Engineer and Product Manager.
-        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product recipe.
+        MISSION: Generate a professional Technical Data Sheet (TDS) based on the provided product info.
         
         PRODUCT NAME: {product_name}
         PRODUCT INTENDED USE: {product_type}
-        INGREDIENTS & COMPOSITION:
+        CHEMICAL NATURE / INGREDIENTS:
         {ingredients}
+        {tds_block}
         
         REQUIREMENTS:
         1. Provide a strong 'Product Description'.
-        2. List 'Application Areas'.
-        3. List 'Features & Benefits'.
-        4. Suggest 'Application & Dosage'.
+        2. List 'Application Areas' (Use user provided text if available, otherwise suggest professionally).
+        3. List 'Features & Benefits' (Use user provided text if available, otherwise suggest professionally).
+        4. Suggest 'Application & Dosage' (Use user provided text if available, otherwise suggest professionally).
+        5. Include 'Packaging & Storage' (Use user provided text if available, otherwise suggest professionally).
         
         STRICT TEMPLATE RULES:
         For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting:
@@ -195,7 +209,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         {sec9_block}
         
         DO NOT use markdown tables ('|' character). Use bullet points instead.
-        DO NOT write header dates. Start directly with the main content.
+        DO NOT write header dates like "Oluşturma Tarihi". Start directly with the main content.
         
         CRITICAL LANGUAGE RULE: 
         You MUST output the ENTIRE document strictly, fluently, and natively in {lang_name.upper()}.
