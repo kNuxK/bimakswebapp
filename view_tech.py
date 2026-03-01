@@ -315,10 +315,10 @@ def render():
                         "Web:": (" ", new_web),
                         "Web": (": ", new_web),
                         "BAŞVURULACAK KİŞİ": ("", new_contact),
-                        "ACİL DURUM TELEFONU": ("", new_tel),
-                        "ACİL DURUM TEL:": (" ", new_tel),
-                        "ACİL DURUM TEL": ("", new_tel),
-                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_tel),
+                        "ACİL DURUM TELEFONU": ("", new_emer),
+                        "ACİL DURUM TEL:": (" ", new_emer),
+                        "ACİL DURUM TEL": ("", new_emer),
+                        "ACİL DURUM TELEFON NUMARALARI:": (" ", new_emer),
                         "GBF Yetkili Kişi:": (" ", new_gbf),
                         "GBF Yetkili Kişi": (": ", new_gbf),
                         "Sertifika Geçerlilik Süresi:": (" ", new_cert_date),
@@ -427,10 +427,10 @@ def render():
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
-    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 133.3 - DİL DESTEKLİ)
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 134.0 - DİNAMİK FORM YAPISI)
     elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
         st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
-        st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
+        st.info(_("Bu modül, girdiğiniz bilgilere dayanarak uluslararası standartlarda tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
         
         c_top1, c_top2 = st.columns(2)
         with c_top1:
@@ -445,7 +445,11 @@ def render():
         c_g3, c_g4 = st.columns(2)
         with c_g3:
             gen_prod_name = st.text_input("Ürün Adı", placeholder="Örn: MAKS 400PD")
-            gen_prod_type = st.text_input("Kullanım Amacı / Ürün Tipi", placeholder="Örn: Ters Osmoz Antiskalantı")
+            if "SDS" in doc_choice:
+                gen_prod_type = st.text_input("Kullanım Amacı / Ürün Tipi", placeholder="Örn: Ters Osmoz Antiskalantı")
+            else:
+                gen_prod_type = st.text_input("Ürün Tanımı / Kategori", placeholder="Örn: Yüksek Performanslı Polimerik Antiskalant")
+                
             gen_cdate = st.text_input("Oluşturma Tarihi", placeholder="Örn: 15.06.2024")
             gen_rdate = st.text_input("Revizyon Tarihi", placeholder="Örn: 20.08.2025")
             gen_vers = st.text_input("Versiyon", placeholder="Örn: 01")
@@ -455,13 +459,17 @@ def render():
             gen_sup_tel = st.text_input("Telefon Numarası", placeholder="Örn: 0 850 522 71 04")
             gen_sup_fax = st.text_input("Faks Numarası", placeholder="Örn: 0 216 321 32 13")
             gen_sup_mail = st.text_input("E-posta", placeholder="Örn: info@bimakskimya.com")
-            gen_sup_addr = st.text_input("Şirket Adresi (Bölüm 1 İçin)", placeholder="Örn: Fatih Sultan Mehmet Mah...")
+            gen_sup_addr = st.text_input("Şirket Adresi", placeholder="Örn: Fatih Sultan Mehmet Mah...")
             gen_footer = st.text_area("Alt Bilgi (Tüm Sayfaların Altına Basılır)", placeholder="Örn: Fatih Sultan Mehmet Mah...\nTel: 0555...\nWeb: www...", height=68)
 
-        st.markdown("### İçerik Formülü")
-        gen_ingredients = st.text_area("Bileşenler ve Yüzdeleri (Reçete)", placeholder="Örn: %10 Sodyum Hidroksit (CAS: 1310-73-2)\n%5 Fosfonat\n%85 Su", height=100)
+        st.markdown("### İçerik ve Formülasyon")
+        # V 134.0: DİNAMİK REÇETE KUTUSU
+        if "SDS" in doc_choice:
+            gen_ingredients = st.text_area("Bileşenler ve Yüzdeleri (Tam Reçete - Zorunlu)", placeholder="Örn: %10 Sodyum Hidroksit (CAS: 1310-73-2)\n%5 Fosfonat\n%85 Su", height=100)
+        else:
+            gen_ingredients = st.text_area("Kimyasal Yapı / Temel Etken Maddeler", placeholder="Örn: Polikarboksilat bazlı kireç önleyici polimer karışımı. (Reçete vermek zorunlu değildir)", height=100)
 
-        with st.expander("🧪 Bölüm 9: Fiziksel ve Kimyasal Özellikler (İsteğe Bağlı)"):
+        with st.expander("🧪 Fiziksel ve Kimyasal Özellikler (İsteğe Bağlı)"):
             st.caption("Boş bırakılırsa AI hesaplar. Özel değer girmek için doldurun. Çıkarmak için '-' yazın.")
             c_91, c_92 = st.columns(2)
             gen_p_state = c_91.text_input("Fiziksel Hali", placeholder="Örn: Sıvı")
@@ -471,12 +479,24 @@ def render():
             gen_p_dens = c_91.text_input("Yoğunluk", placeholder="Örn: 1.10 - 1.12 g/cm³")
             gen_p_flash = c_92.text_input("Parlama Noktası", placeholder="Örn: Uygulanamaz")
             
-        with st.expander("🕒 Bölüm 16: Revizyon Bilgileri (İsteğe Bağlı)"):
-            st.caption("Boş bırakılırsa yazılmaz. Çıkarmak için '-' yazın.")
-            c_161, c_162 = st.columns(2)
-            gen_rev_no = c_161.text_input("Revizyon No", placeholder="Örn: 02")
-            gen_rev_date = c_162.text_input("Bölüm 16 Revizyon Tarihi", placeholder="Örn: 20.08.2025")
-            gen_prev_date = c_161.text_input("Önceki GBF Tarihi", placeholder="Örn: 15.06.2024")
+        # V 134.0: DİNAMİK TDS PANELİ VE SDS BÖLÜM 16
+        if "SDS" in doc_choice:
+            tds_areas = tds_benefits = tds_dosage = tds_pack = ""
+            with st.expander("🕒 Bölüm 16: Revizyon Bilgileri (İsteğe Bağlı)"):
+                st.caption("Boş bırakılırsa yazılmaz. Çıkarmak için '-' yazın.")
+                c_161, c_162 = st.columns(2)
+                gen_rev_no = c_161.text_input("Revizyon No", placeholder="Örn: 02")
+                gen_rev_date = c_162.text_input("Bölüm 16 Revizyon Tarihi", placeholder="Örn: 20.08.2025")
+                gen_prev_date = c_161.text_input("Önceki GBF Tarihi", placeholder="Örn: 15.06.2024")
+        else:
+            gen_rev_no = gen_rev_date = gen_prev_date = ""
+            with st.expander("📝 TDS Özel Bölümleri (İsteğe Bağlı)"):
+                st.caption("Boş bırakırsanız AI kendisi ürün adına ve kimyasal yapıya göre üretecektir. Kendi metninizi yazarsanız AI doğrudan onu kullanır.")
+                c_t1, c_t2 = st.columns(2)
+                tds_areas = c_t1.text_area("Kullanım Alanları", placeholder="Örn: Ters osmoz sistemlerinde membran koruyucu olarak kullanılır.")
+                tds_benefits = c_t2.text_area("Özellikler ve Avantajlar", placeholder="Örn: Kireçlenmeyi önler, membran ömrünü uzatır, temizlik maliyetlerini düşürür.")
+                tds_dosage = c_t1.text_area("Uygulama ve Dozaj", placeholder="Örn: Sistem kapasitesine göre besleme suyuna 2-5 ppm dozlanmalıdır.")
+                tds_pack = c_t2.text_area("Ambalaj ve Depolama", placeholder="Örn: 25 kg bidon ve 1000 kg IBC. Serin ve kuru yerde saklanmalıdır.")
 
         extra_params = {
             "c_date": gen_cdate,
@@ -495,12 +515,16 @@ def render():
             "p_flash": gen_p_flash,
             "rev_no": gen_rev_no,
             "rev_date": gen_rev_date,
-            "prev_date": gen_prev_date
+            "prev_date": gen_prev_date,
+            "tds_areas": tds_areas,
+            "tds_benefits": tds_benefits,
+            "tds_dosage": tds_dosage,
+            "tds_pack": tds_pack
         }
             
         if st.button("AI ile Belgeyi PDF Olarak Üret", type="primary"):
             if not gen_prod_name or not gen_ingredients:
-                st.warning("Lütfen Ürün Adı ve Bileşenleri (Reçeteyi) girin.")
+                st.warning("Lütfen Ürün Adı ve Bileşenleri (İçeriği) girin.")
             else:
                 db_engine.ping_online(st.session_state['current_user'])
                 with st.spinner("AI kimyasal formülü analiz ediyor ve uluslararası normlara göre PDF üretiyor... (Bu işlem 15-30 saniye sürebilir)"):
@@ -510,7 +534,7 @@ def render():
                         gen_ingredients, 
                         doc_choice, 
                         st.session_state['settings_db']["genai_key"], 
-                        gen_doc_lang, # V 133.3: SEÇİLEN DİL BİLGİSİ
+                        gen_doc_lang, 
                         extra_params
                     )
                     
@@ -523,7 +547,7 @@ def render():
                             text_content=res_text, 
                             logo_bytes=gen_logo.getvalue() if gen_logo else None, 
                             footer_text=gen_footer, 
-                            lang_code=gen_doc_lang, # V 133.3: SEÇİLEN DİL BİLGİSİ
+                            lang_code=gen_doc_lang, 
                             header_params=extra_params
                         )
                         
