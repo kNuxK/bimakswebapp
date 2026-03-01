@@ -99,7 +99,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
             val = extra_params.get(key, '')
             if val == '-': return
             if not val: 
-                s9_lines.append(f"- {label}: (AI_LUTFEN_HESAPLA)")
+                s9_lines.append(f"- {label}: [AI_ESTIMATE]")
             else:
                 s9_lines.append(f"- {label}: {val}")
             
@@ -158,7 +158,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
 
         For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT OR PARENTHESES. 
         If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses.
-        If it says '(AI_LUTFEN_HESAPLA)', ONLY THEN should you replace that specific tag entirely with your scientific estimation. Do not print the tag.
+        If it says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag entirely with your scientific estimation. Do not print the tag "[AI_ESTIMATE]".
         {sec9_block}
 
         For SECTION 16 (Other Info), append these exact revision lines at the end if provided:
@@ -191,7 +191,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
 
         For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT. 
         If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses.
-        If it says '(AI_LUTFEN_HESAPLA)', ONLY THEN replace it entirely with your scientific estimation. 
+        If it says '[AI_ESTIMATE]', ONLY THEN replace it entirely with your scientific estimation. Do not print "[AI_ESTIMATE]".
         {sec9_block}
         
         DO NOT use markdown tables ('|' character). Use bullet points instead.
