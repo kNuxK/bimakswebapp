@@ -124,6 +124,7 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
             except: pass
             
+        # V 132.1: TARİHLER SOL TARAFA (X=40) HİZALANDI
         if header_params and page_num == 1:
             canvas_obj.setFont(font_name, 9)
             canvas_obj.setFillColorRGB(0, 0, 0)
@@ -168,8 +169,9 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 continue
                 
             is_header = p.startswith('#')
-            clean_p = p.replace('#', '').replace('**', '').replace('*', '').replace('|', ' ').strip()
+            clean_p = p.replace('#', '').replace('**', '').replace('*', '').strip()
             
+            # KATI TABLO ÇİZİCİ
             if clean_p.startswith('|'):
                 if clean_p.replace('|', '').replace('-', '').replace(':', '').replace(' ', '') == '':
                     continue 
@@ -216,6 +218,8 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 
                 text_y -= 4
                 continue
+            
+            clean_p = clean_p.replace('|', '')
             
             if is_header:
                 c.setFont(font_name, 12)
