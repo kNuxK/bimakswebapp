@@ -75,7 +75,7 @@ def construct_prompt_text(role, topic, audience, platform, product, limit, lang_
        - ✅ Actionable Solution (Provide concrete, technical steps or metrics - Use Bullet Points)
        {product_instruction}
        {link_instruction}
-    5. FORMATTING: Use short paragraphs for readability, and relevant industrial emojis (e.g., ⚗️, ⚙️, 🏭, 💧, 📊) to structure the data.
+    5. FORMATTING: Use short paragraphs for readability, and relevant industrial emojis (e.g., ⚗️, 🏭, 💧, 📊) to structure the data.
     """
     return prompt.strip()
 
@@ -99,7 +99,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
             val = extra_params.get(key, '')
             if val == '-': return
             if not val: 
-                s9_lines.append(f"- {label}: [AI_ESTIMATE]")
+                s9_lines.append(f"- {label}: (AI_LUTFEN_HESAPLA)")
             else:
                 s9_lines.append(f"- {label}: {val}")
             
@@ -133,23 +133,32 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         {ingredients}
         
         REQUIREMENTS:
-        1. Calculate or estimate the hazard classifications (H-codes, P-codes).
+        1. Calculate the hazard classifications (H-codes, P-codes).
         2. Determine the UN Number for Section 14.
         3. Structure the output strictly into the standard 16 SDS sections.
         
         STRICT TEMPLATE RULES (YOU MUST FOLLOW THESE OR FAIL):
+        
         For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting any line:
         {sec1_block}
 
-        For SECTION 3 (Composition), you MUST output the ingredients as a Markdown table.
-        Use EXACTLY this format with the pipe (|) character:
+        For SECTION 2 (Hazard Identification), if the substance has a hazard, YOU MUST INCLUDE THE PICTOGRAM MARKDOWN LINK exactly as written below in your response:
+        - Corrosive/Aşındırıcı: ![GHS05](https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/GHS-pictogram-corrosion.svg/120px-GHS-pictogram-corrosion.svg.png)
+        - Flammable/Yanıcı: ![GHS02](https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/GHS-pictogram-flamme.svg/120px-GHS-pictogram-flamme.svg.png)
+        - Toxic/Sağlık Tehlikesi: ![GHS08](https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/GHS-pictogram-silhouete.svg/120px-GHS-pictogram-silhouete.svg.png)
+        - Irritant/Tahriş Edici: ![GHS07](https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/GHS-pictogram-exclam.svg/120px-GHS-pictogram-exclam.svg.png)
+        - Environmental/Çevre: ![GHS09](https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/GHS-pictogram-pollu.svg/120px-GHS-pictogram-pollu.svg.png)
+
+        For SECTION 3 (Composition), you MUST output the ingredients as a STRICT Markdown table. 
+        EVERY SINGLE ROW MUST START WITH THE '|' CHARACTER AND END WITH THE '|' CHARACTER. Do not break this format.
+        Example:
         | Kimyasal Adı | EC No | CAS No | Konsantrasyon | GHS Sınıflandırması |
         |---|---|---|---|---|
-        (Fill the rows below the header based on the recipe provided).
+        | Su | 231-791-2 | 7732-18-5 | %80 | Sınıflandırılmamış |
 
-        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT. 
-        If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses (e.g., do not add "(Sıvı)" or "(Su bazlı)" or anything else).
-        If it says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag with a scientific estimation. 
+        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT OR PARENTHESES. 
+        If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses.
+        If it says '(AI_LUTFEN_HESAPLA)', ONLY THEN should you replace that specific tag entirely with your scientific estimation. Do not print the tag.
         {sec9_block}
 
         For SECTION 16 (Other Info), append these exact revision lines at the end if provided:
@@ -182,7 +191,7 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
 
         For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT. 
         If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses.
-        If it says '[AI_ESTIMATE]', ONLY THEN replace it with your scientific estimation. 
+        If it says '(AI_LUTFEN_HESAPLA)', ONLY THEN replace it entirely with your scientific estimation. 
         {sec9_block}
         
         DO NOT use markdown tables ('|' character). Use bullet points instead.
