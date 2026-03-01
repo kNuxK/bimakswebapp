@@ -141,14 +141,15 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting any line:
         {sec1_block}
 
-        For SECTION 3 (Composition), you MUST output the ingredients as a Markdown table with EXACTLY these 5 columns:
+        For SECTION 3 (Composition), you MUST output the ingredients as a Markdown table.
+        Use EXACTLY this format with the pipe (|) character:
         | Kimyasal Adı | EC No | CAS No | Konsantrasyon | GHS Sınıflandırması |
+        |---|---|---|---|---|
         (Fill the rows below the header based on the recipe provided).
 
-        For SECTION 9 (Physical Properties), YOU MUST STRICTLY USE THE EXACT VALUES PROVIDED BELOW. 
-        DO NOT append your own estimates in parentheses next to the provided values. ONLY output the value given.
-        If a value says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag with a scientific estimation. 
-        If a physical property is not in this list, do not invent it.
+        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT. 
+        If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses (e.g., do not add "(Sıvı)" or "(Su bazlı)" or anything else).
+        If it says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag with a scientific estimation. 
         {sec9_block}
 
         For SECTION 16 (Other Info), append these exact revision lines at the end if provided:
@@ -179,9 +180,9 @@ def generate_sds_from_recipe_with_gemini(product_name, product_type, ingredients
         For SECTION 1 (Identification), you MUST exactly include this information WITHOUT altering or omitting:
         {sec1_block}
 
-        For SECTION 9 (Physical Properties), YOU MUST STRICTLY USE THE EXACT VALUES PROVIDED BELOW. 
-        DO NOT append your own estimates in parentheses next to the provided values. ONLY output the value given.
-        If a value says '[AI_ESTIMATE]', ONLY THEN should you replace that specific tag with a scientific estimation. 
+        For SECTION 9 (Physical Properties), YOU ARE FORBIDDEN FROM ADDING EXTRA TEXT. 
+        If a value is provided below, output it EXACTLY as written. DO NOT add explanations in parentheses.
+        If it says '[AI_ESTIMATE]', ONLY THEN replace it with your scientific estimation. 
         {sec9_block}
         
         DO NOT use markdown tables ('|' character). Use bullet points instead.
