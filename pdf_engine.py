@@ -2,6 +2,7 @@ import io
 import os
 import requests
 import textwrap
+import re
 from PIL import Image, ImageDraw, ImageFont
 import config
 
@@ -124,7 +125,7 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
             except: pass
             
-        # V 132.1: TARİHLER SOL TARAFA (X=40) HİZALANDI
+        # V 133.0: TARİHLER SOL TARAFA (X=40) HİZALANDI - LOGOYLA ÇAKIŞMAZ
         if header_params and page_num == 1:
             canvas_obj.setFont(font_name, 9)
             canvas_obj.setFillColorRGB(0, 0, 0)
@@ -162,24 +163,48 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
     text_y = height - 110
     
     if text_content:
+        # Temizlik ve ayrıştırma
+        text_content = text_content.replace('(AI_LUTFEN_HESAPLA)', '').replace('[AI_ESTIMATE]', '')
+        
         for p in text_content.split('\n'):
             p = p.strip()
             if not p:
                 text_y -= 8
                 continue
-                
-            is_header = p.startswith('#')
-            clean_p = p.replace('#', '').replace('**', '').replace('*', '').strip()
             
-            # KATI TABLO ÇİZİCİ
-            if clean_p.startswith('|'):
+            # V 133.0: PİKTOGRAM GÖRSEL MOTORU EKLENDİ
+            img_matches = re.findall(r'!\[.*?\]\((.*?)\)', p)
+            clean_p = re.sub(r'!\[.*?\]\(.*?\)', '', p).strip() # Yazıdan linki sil
+            clean_p = clean_p.replace('#', '').replace('**', '').replace('*', '').strip()
+            
+            # V 133.0: AÇIK GRİ BAŞLIK FONU (HEADER BANNER)
+            is_main_header = clean_p.upper().startswith('BÖLÜM') or clean_p.upper().startswith('SECTION')
+            is_sub_header = p.startswith('##') or p.startswith('###')
+            
+            if is_main_header or is_sub_header:
+                c.setFillColorRGB(0.92, 0.92, 0.95) # Açık gri-mavi
+                c.rect(35, text_y - 4, 520, 18, fill=1, stroke=0)
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont(font_name, 11)
+            else:
+                c.setFont(font_name, 9)
+            
+            # V 133.0: GÜÇLENDİRİLMİŞ TABLO MOTORU
+            if clean_p.startswith('|') and clean_p.endswith('|'):
                 if clean_p.replace('|', '').replace('-', '').replace(':', '').replace(' ', '') == '':
-                    continue 
-                cols = [col.strip() for col in clean_p.strip('|').split('|')]
-                col_bounds = [40, 160, 230, 310, 390, 555] 
+                    continue # Tablo ayraçlarını atla
                 
+                cols = [col.strip() for col in clean_p.strip('|').split('|')]
+                col_count = len(cols)
+                
+                if col_count == 5: col_bounds = [40, 150, 220, 290, 400, 555]
+                elif col_count == 4: col_bounds = [40, 180, 280, 400, 555]
+                else:
+                    step = 515 / max(1, col_count)
+                    col_bounds = [40 + int(i*step) for i in range(col_count+1)]
+                    
                 c.setLineWidth(0.5)
-                c.setStrokeColorRGB(0.5, 0.5, 0.5)
+                c.setStrokeColorRGB(0.7, 0.7, 0.7)
                 c.line(40, text_y + 10, 555, text_y + 10) 
                 
                 col_wrapped = []
@@ -220,13 +245,6 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 continue
             
             clean_p = clean_p.replace('|', '')
-            
-            if is_header:
-                c.setFont(font_name, 12)
-                text_y -= 6
-            else:
-                c.setFont(font_name, 9)
-                
             wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
             
             for wl in wrapped:
@@ -235,11 +253,27 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                     page_num += 1
                     draw_bg(c, page_num)
                     text_y = height - 110
-                    c.setFont(font_name, 12 if is_header else 9)
+                    if is_main_header or is_sub_header: c.setFont(font_name, 11)
+                    else: c.setFont(font_name, 9)
                     
                 c.drawString(40, text_y, wl)
                 text_y -= 12
             text_y -= 4 
+            
+            # Eğer satırda Piktogram linki varsa o resmi PDF'e bas!
+            if img_matches:
+                img_x = 40
+                text_y -= 5 
+                for img_url in img_matches:
+                    try:
+                        r = requests.get(img_url, stream=True, timeout=5)
+                        if r.status_code == 200:
+                            pil_img = Image.open(io.BytesIO(r.content)).convert("RGBA")
+                            c.drawImage(ImageReader(pil_img), img_x, text_y - 40, width=40, height=40, preserveAspectRatio=True, mask='auto')
+                            img_x += 50
+                    except: pass
+                if img_matches:
+                    text_y -= 45 # Resimler için boşluk bırak
             
     c.save()
     buffer.seek(0)
