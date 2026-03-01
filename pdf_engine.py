@@ -125,7 +125,7 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 canvas_obj.drawImage(logo_img, width - w - 40, height - h - 20, width=w, height=h, preserveAspectRatio=True, mask='auto')
             except: pass
             
-        # V 133.1: TARİHLER SOL TARAFA (X=40) HİZALANDI - LOGOYLA ÇAKIŞMAZ
+        # V 133.2: TARİHLER SOL TARAFA (X=40) HİZALANDI - LOGOYLA ÇAKIŞMAZ
         if header_params and page_num == 1:
             canvas_obj.setFont(font_name, 9)
             canvas_obj.setFillColorRGB(0, 0, 0)
@@ -172,23 +172,37 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 text_y -= 8
                 continue
             
-            # V 133.1: PİKTOGRAM GÖRSEL MOTORU EKLENDİ
-            img_matches = re.findall(r'!\[.*?\]\((.*?)\)', p)
-            clean_p = re.sub(r'!\[.*?\]\(.*?\)', '', p).strip() # Yazıdan linki sil
+            # V 133.2: PİKTOGRAM GÖRSEL MOTORU VE REGEX TEMİZLİĞİ
+            img_urls = re.findall(r'https?://[^\s\)]+\.png', p)
+            clean_p = re.sub(r'!\[.*?\]\s*\([^\)]+\)', '', p).strip()
+            
+            # Markdown regex'den kaçan URL'ler varsa onları da gizle
+            for url in img_urls:
+                clean_p = clean_p.replace(url, '').strip()
+            clean_p = clean_p.replace('![]', '').replace('()', '').replace('[]', '').strip()
+            
             clean_p = clean_p.replace('#', '').replace('**', '').replace('*', '').strip()
             
             is_main_header = clean_p.upper().startswith('BÖLÜM') or clean_p.upper().startswith('SECTION')
             is_sub_header = p.startswith('##') or p.startswith('###')
             
-            # V 133.1: YETİM BAŞLIK (ORPHAN HEADER) RADARI
-            # Eğer sayfanın dibine gelindiyse ve bir başlık veya tablo geliyorsa doğrudan yeni sayfaya atla.
-            if (is_main_header or is_sub_header or (clean_p.startswith('|') and clean_p.endswith('|'))) and text_y < 140:
+            is_table_row = clean_p.startswith('|') and clean_p.endswith('|')
+            is_table_header = is_table_row and ('KİMYASAL' in clean_p.upper() or 'CAS' in clean_p.upper() or 'BİLEŞEN' in clean_p.upper())
+            
+            # V 133.2: YETİM BAŞLIK VE TABLO (ORPHAN HEADER) RADARI
+            if (is_main_header or is_sub_header) and text_y < 120:
+                c.showPage()
+                page_num += 1
+                draw_bg(c, page_num)
+                text_y = height - 110
+                
+            if is_table_header and text_y < 280:
                 c.showPage()
                 page_num += 1
                 draw_bg(c, page_num)
                 text_y = height - 110
             
-            # V 133.1: AÇIK GRİ BAŞLIK FONU (HEADER BANNER)
+            # V 133.2: AÇIK GRİ BAŞLIK FONU (HEADER BANNER)
             if is_main_header or is_sub_header:
                 c.setFillColorRGB(0.92, 0.92, 0.95) # Açık gri-mavi
                 c.rect(35, text_y - 4, 520, 18, fill=1, stroke=0)
@@ -197,13 +211,16 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
             else:
                 c.setFont(font_name, 9)
             
-            # V 133.1: GÜÇLENDİRİLMİŞ TABLO MOTORU
+            # V 133.2: GÜÇLENDİRİLMİŞ TABLO MOTORU
             if clean_p.startswith('|') and clean_p.endswith('|'):
                 if clean_p.replace('|', '').replace('-', '').replace(':', '').replace(' ', '') == '':
                     continue # Tablo ayraçlarını atla
                 
-                cols = [col.strip() for col in clean_p.strip('|').split('|')]
+                raw_cols = clean_p.split('|')
+                cols = [col.strip() for col in raw_cols[1:-1]] 
                 col_count = len(cols)
+                
+                if col_count == 0: continue
                 
                 if col_count == 5: col_bounds = [40, 150, 220, 290, 400, 555]
                 elif col_count == 4: col_bounds = [40, 180, 280, 400, 555]
@@ -255,7 +272,9 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
             clean_p = clean_p.replace('|', '')
             wrapped = textwrap.wrap(clean_p, width=105) if clean_p else [""]
             
+            # Resmi basmadan önce kalan yazıyı (eğer varsa) bas
             for wl in wrapped:
+                if wl.strip() == "": continue
                 if text_y < 85: 
                     c.showPage()
                     page_num += 1
@@ -268,22 +287,23 @@ def create_generated_document_pdf(text_content, logo_bytes=None, footer_text=Non
                 text_y -= 12
             text_y -= 4 
             
-            # PİKTOGRAM KILIK DEĞİŞTİRİCİSİ (403 Forbidden Aşma)
-            if img_matches:
+            # V 133.2: PİKTOGRAM KILIK DEĞİŞTİRİCİSİ (403 Forbidden Aşma)
+            if img_urls:
                 img_x = 40
                 text_y -= 5 
-                for img_url in img_matches:
+                for img_url in img_urls:
                     try:
-                        # Wikipedia'nın bot engelini aşmak için Chrome tarayıcısı gibi davranıyoruz
-                        req_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+                        req_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
                         r = requests.get(img_url, headers=req_headers, stream=True, timeout=10)
                         if r.status_code == 200:
+                            # PNG Alpha (Saydamlık) Kanalını Beyaz Arka Plana Yedirme
                             pil_img = Image.open(io.BytesIO(r.content)).convert("RGBA")
-                            c.drawImage(ImageReader(pil_img), img_x, text_y - 40, width=40, height=40, preserveAspectRatio=True, mask='auto')
-                            img_x += 50
+                            bg = Image.new("RGB", pil_img.size, (255, 255, 255))
+                            bg.paste(pil_img, mask=pil_img.split()[3])
+                            c.drawImage(ImageReader(bg), img_x, text_y - 45, width=45, height=45, preserveAspectRatio=True)
+                            img_x += 55
                     except: pass
-                if img_matches:
-                    text_y -= 45 # Resimler çizildikten sonra metne geçmeden önce satır boşluğu bırak
+                text_y -= 50 # Resimler çizildikten sonra metne geçmeden önce satır boşluğu bırak
             
     c.save()
     buffer.seek(0)
