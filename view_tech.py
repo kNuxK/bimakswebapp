@@ -42,7 +42,7 @@ def render():
         st.warning("Bu modülün hiçbir alt başlığına yetkiniz bulunmamaktadır.")
         st.stop()
         
-    if st.session_state['bimaks_sub_tab'] not in tab_keys:
+    if st.session_state.get('bimaks_sub_tab') not in tab_keys:
         st.session_state['bimaks_sub_tab'] = tab_keys[0]
         
     nav_cols = st.columns(len(nav_tabs))
@@ -427,13 +427,20 @@ def render():
             )
             st.image(preview_img, caption=f"Sanal A4 Önizlemesi ({doc_type} Belgeniz)", use_container_width=True)
 
-    # G. SIFIRDAN SDS/TDS ÜRETİCİ
+    # G. SIFIRDAN SDS/TDS ÜRETİCİ (V 133.3 - DİL DESTEKLİ)
     elif st.session_state['bimaks_sub_tab'] == 'SDS_Gen' and ("tech_sds_gen" in perms or is_admin):
         st.subheader(_("Sıfırdan SDS/TDS Formülasyon Motoru (AI)", "SDS/TDS Formulation Engine (AI)", "Механизм формулирования SDS/TDS (ИИ)", "محرك صياغة SDS/TDS (الذكاء الاصطناعي)", "Moteur de formulation FDS/FT (IA)", "Motor de formulación HDS/HT (IA)"))
         st.info(_("Bu modül, girdiğiniz hammadde ve etken maddelere dayanarak uluslararası standartlarda 16 maddelik tam teşekküllü bir Güvenlik Bilgi Formu veya TDS oluşturur. Her sayfaya logo ve adres basarak PDF üretir.", "Generates 16-section SDS based on raw materials.", "Создает SDS на основе сырья.", "يولد SDS بناءً على المواد الخام.", "Génère une FDS basée sur les matières premières.", "Genera HDS basado en materias primas."))
         
-        doc_choice = st.radio("Belge Türü", ["SDS (Güvenlik Bilgi Formu)", "TDS (Teknik Veri Bülteni)"], horizontal=True)
-        
+        c_top1, c_top2 = st.columns(2)
+        with c_top1:
+            doc_choice = st.radio("Belge Türü / Document Type", ["SDS (Güvenlik Bilgi Formu)", "TDS (Teknik Veri Bülteni)"], horizontal=True)
+        with c_top2:
+            lang_options = list(config.LANGUAGES.keys())
+            current_lang = st.session_state.get('lang', 'TR')
+            default_index = lang_options.index(current_lang) if current_lang in lang_options else 0
+            gen_doc_lang = st.selectbox("Belge Dili / Document Language", lang_options, index=default_index, format_func=lambda x: config.LANGUAGES[x]['name'])
+            
         st.markdown("### Belge ve Tedarikçi Detayları")
         c_g3, c_g4 = st.columns(2)
         with c_g3:
@@ -503,7 +510,7 @@ def render():
                         gen_ingredients, 
                         doc_choice, 
                         st.session_state['settings_db']["genai_key"], 
-                        st.session_state['lang'],
+                        gen_doc_lang, # V 133.3: SEÇİLEN DİL BİLGİSİ
                         extra_params
                     )
                     
@@ -511,11 +518,12 @@ def render():
                         st.error(res_text)
                     else:
                         st.session_state['generated_sds_content'] = res_text
+                        
                         pdf_bytes = pdf_engine.create_generated_document_pdf(
                             text_content=res_text, 
                             logo_bytes=gen_logo.getvalue() if gen_logo else None, 
                             footer_text=gen_footer, 
-                            lang_code=st.session_state.get('lang', 'TR'),
+                            lang_code=gen_doc_lang, # V 133.3: SEÇİLEN DİL BİLGİSİ
                             header_params=extra_params
                         )
                         
@@ -536,6 +544,3 @@ def render():
             )
             with st.expander("📄 Üretilen Ham Metni Gör (Düzenleme / Kontrol İçin)"):
                 st.markdown(st.session_state.get('generated_sds_content', ''))
-
-def render():
-    render_tech()
